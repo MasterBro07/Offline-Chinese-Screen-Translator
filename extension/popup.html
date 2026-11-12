@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>Auto Translator</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body class="popup">
+  <header>
+    <img src="icons/icon48.png" alt="" width="24" height="24">
+    <h1>Auto Translator</h1>
+  </header>
+
+  <section class="status" aria-live="polite">
+    <div class="row">
+      <span class="label">Sprachpaket</span>
+      <span class="value" id="pack-status" data-state="">…</span>
+    </div>
+    <div class="row">
+      <span class="label">Desktop-App</span>
+      <span class="value" id="app-status" data-state="">…</span>
+    </div>
+  </section>
+
+  <button id="download" class="primary" hidden>Sprachpaket laden</button>
+  <p id="download-error" class="hint error" hidden></p>
+  <p id="api-hint" class="hint error" hidden></p>
+
+  <section class="toggles">
+    <label class="toggle">
+      <input type="checkbox" id="enabled">
+      <span>Webseiten automatisch übersetzen</span>
+    </label>
+    <label class="toggle" id="site-row" hidden>
+      <input type="checkbox" id="site-off">
+      <span>Auf dieser Seite deaktivieren<small id="site-name"></small></span>
+    </label>
+  </section>
+
+  <p class="hint">Chinesisch → Englisch, kostenlos und direkt auf diesem Gerät.</p>
+
+  <script src="pack.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

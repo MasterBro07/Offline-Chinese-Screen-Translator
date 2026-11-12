@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Auto Translator einrichten</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body class="page">
+  <main class="card">
+    <h1>Willkommen bei Auto Translator</h1>
+    <p class="lead">
+      Chinesischer Text wird automatisch ins Englische übersetzt – ohne Klick, kostenlos
+      und direkt auf diesem Gerät. Einmalig ist nur ein kurzer Schritt nötig.
+    </p>
+
+    <ol class="steps">
+      <li>
+        <h2>Sprachpaket laden</h2>
+        <p>
+          Chrome lädt das Sprachpaket Chinesisch → Englisch einmalig herunter.
+          Das erfordert genau einen Klick.
+        </p>
+        <p>Status: <span class="value" id="pack-status" data-state="" aria-live="polite">…</span></p>
+        <button id="download" class="primary" hidden>Sprachpaket laden</button>
+        <p id="download-error" class="hint error" hidden></p>
+        <p id="api-hint" class="hint error" hidden></p>
+      </li>
+      <li>
+        <h2>Webseiten öffnen wie gewohnt</h2>
+        <p>
+          Sobald das Sprachpaket bereit ist, werden chinesische Texte auf allen Webseiten
+          von selbst übersetzt. Bereits geöffnete Seiten bitte einmal neu laden.
+          Über das Symbol der Erweiterung lässt sich die Übersetzung jederzeit
+          ganz oder nur für eine einzelne Seite abschalten.
+        </p>
+      </li>
+      <li>
+        <h2>Optional: Desktop-App starten</h2>
+        <p>
+          Für chinesischen Text in normalen Windows-Programmen die Auto-Translator-App starten.
+          Sie verbindet sich automatisch mit dieser Erweiterung; Chrome muss dabei geöffnet sein.
+        </p>
+      </li>
+    </ol>
+  </main>
+
+  <script src="pack.js"></script>
+  <script src="welcome.js"></script>
+</body>
+</html>

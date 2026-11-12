@@ -55,10 +55,12 @@
   //   "missing"  API present, but the language pack is reported as not downloaded
   /** Fake backend for automated tests. */
   function createFakeTranslatorApi(packMissing) {
+    // Like the real API, the fake only knows real language codes.
+    const known = (o) => !!o && /^zh(-Hant)?$/.test(o.sourceLanguage) && o.targetLanguage === 'en';
     return {
-      availability: async () => (packMissing ? 'downloadable' : 'available'),
-      create: async () => {
-        if (packMissing) throw new Error('language pack missing');
+      availability: async (o) => (!known(o) ? 'unavailable' : packMissing ? 'downloadable' : 'available'),
+      create: async (o) => {
+        if (packMissing || !known(o)) throw new Error('language pack missing');
         return {
           translate: async (text) => 'EN[' + text + ']',
           destroy() {},
@@ -443,7 +445,7 @@
     if (stopped) return false;
     if (message.type === 'engine.translate') {
       // Page batch from a content script.
-      translateForPages(message.texts, message.source, message.target).then(
+      translateForPages(message.texts, message.sourceLanguage, message.targetLanguage).then(
         (result) => sendResponse({ ok: true, translations: result.translations, engine: result.engine }),
         (e) => {
           sendResponse({ ok: false, notReady: !ready, error: String((e && e.message) || e) });

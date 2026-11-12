@@ -219,8 +219,8 @@ async function handleMessage(message, sender) {
       try {
         return await sendToEngine({
           type: 'engine.translate',
-          source: LANGUAGE.test(message.source) ? message.source : 'zh',
-          target: LANGUAGE.test(message.target) ? message.target : 'en',
+          sourceLanguage: LANGUAGE.test(message.source) ? message.source : 'zh',
+          targetLanguage: LANGUAGE.test(message.target) ? message.target : 'en',
           texts: message.texts,
         });
       } catch (e) {

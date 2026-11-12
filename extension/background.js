@@ -135,11 +135,66 @@ async function handleEngineHello(message, sender) {
     // Not available in a normal extension page either: Chrome cannot do it.
     await setMode('none');
     await chrome.storage.local.set({
-      engineState: { apiPresent: false, availability: 'unavailable', ready: false, bridgeConnected: false, host: 'none' },
+      engineState: sanitizeEngineState({ host: 'none' }),
     });
     if (sender.tab) chrome.tabs.remove(sender.tab.id).catch(() => {});
   }
   return { shutdown: true };
+}
+
+// ----------------------------------------------------------------- validation
+//
+// Content scripts run inside web page processes. Their messages carry our
+// extension id too, so everything that is not plain page translation is only
+// accepted from the extension's own documents, and page batches are checked.
+
+const EXTENSION_BASE = chrome.runtime.getURL('');
+const ENGINE_URLS = [chrome.runtime.getURL(OFFSCREEN_PATH), ENGINE_TAB_URL];
+const DEBUG_FAKE_VALUES = new Set(['all', 'tab', 'offscreen', 'none', 'missing']);
+const MAX_REQUEST_TEXTS = 200;
+const MAX_REQUEST_CHARS = 100000;
+const LANGUAGE = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8}){0,2}$/;
+
+function fromExtensionPage(sender) {
+  return typeof sender.url === 'string' && sender.url.startsWith(EXTENSION_BASE);
+}
+
+function fromEngine(sender) {
+  return typeof sender.url === 'string' && ENGINE_URLS.some((u) => sender.url.split(/[?#]/)[0] === u);
+}
+
+function validTexts(texts) {
+  if (!Array.isArray(texts) || texts.length === 0 || texts.length > MAX_REQUEST_TEXTS) return false;
+  let chars = 0;
+  for (const text of texts) {
+    if (typeof text !== 'string') return false;
+    chars += text.length;
+  }
+  return chars <= MAX_REQUEST_CHARS;
+}
+
+function sanitizeEngineState(state) {
+  const s = state && typeof state === 'object' ? state : {};
+  const text = (v, fallback) => (typeof v === 'string' && v.length <= 40 ? v : fallback);
+  return {
+    apiPresent: s.apiPresent === true,
+    availability: text(s.availability, 'unavailable'),
+    ready: s.ready === true,
+    bridgeConnected: s.bridgeConnected === true,
+    host: text(s.host, 'none'),
+    premium: s.premium === true,
+    usePremium: s.usePremium !== false,
+    pagesReady: s.pagesReady === true,
+    pageEngine: text(s.pageEngine, 'chrome'),
+  };
+}
+
+async function getUsePremium() {
+  try {
+    return (await chrome.storage.sync.get('usePremium')).usePremium !== false;
+  } catch (e) {
+    return true;
+  }
 }
 
 async function handleMessage(message, sender) {
@@ -149,21 +204,23 @@ async function handleMessage(message, sender) {
       const port = Number(cfg.bridgePort);
       return {
         port: Number.isInteger(port) && port > 0 && port < 65536 ? port : DEFAULT_PORT,
-        debugFake: cfg.debugFakeTranslator || null,
+        debugFake: DEBUG_FAKE_VALUES.has(cfg.debugFakeTranslator) ? cfg.debugFakeTranslator : null,
+        usePremium: await getUsePremium(),
       };
     }
     case 'engine.hello':
       return handleEngineHello(message, sender);
     case 'engine.state':
-      await chrome.storage.local.set({ engineState: message.state });
+      await chrome.storage.local.set({ engineState: sanitizeEngineState(message.state) });
       return { ok: true };
     case 'translate': {
       // From content scripts. Languages are fixed for now (zh -> en).
+      if (!validTexts(message.texts)) return { ok: false, error: 'bad-request' };
       try {
         return await sendToEngine({
           type: 'engine.translate',
-          source: message.source || 'zh',
-          target: message.target || 'en',
+          sourceLanguage: LANGUAGE.test(message.source) ? message.source : 'zh',
+          targetLanguage: LANGUAGE.test(message.target) ? message.target : 'en',
           texts: message.texts,
         });
       } catch (e) {
@@ -185,10 +242,19 @@ async function handleMessage(message, sender) {
   }
 }
 
-const HANDLED = new Set(['engine.getConfig', 'engine.hello', 'engine.state', 'translate', 'recheck']);
+// Who may send what. 'translate' is the only message accepted from content scripts.
+const HANDLED = new Map([
+  ['engine.getConfig', fromEngine],
+  ['engine.hello', fromEngine],
+  ['engine.state', fromEngine],
+  ['recheck', fromExtensionPage],
+  ['translate', () => true],
+]);
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (!message || sender.id !== chrome.runtime.id || !HANDLED.has(message.type)) return false;
+  if (!message || typeof message !== 'object' || sender.id !== chrome.runtime.id) return false;
+  const allowed = HANDLED.get(message.type);
+  if (!allowed || !allowed(sender)) return false;
   handleMessage(message, sender).then(sendResponse, (e) => sendResponse({ ok: false, error: String(e && e.message || e) }));
   return true; // async response
 });
@@ -230,4 +296,8 @@ chrome.tabs.onRemoved.addListener(async () => {
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && (changes.bridgePort || changes.debugFakeTranslator)) restartEngine();
+  if (area === 'sync' && changes.usePremium) {
+    // User switched the desktop app's engine for web pages on or off.
+    sendToEngine({ type: 'engine.config', usePremium: changes.usePremium.newValue !== false }).catch(() => {});
+  }
 });

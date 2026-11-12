@@ -1,0 +1,73 @@
+<!doctype html><meta charset=utf-8><title>shop</title>
+<style>.flex{display:flex}</style>
+<body>
+<!-- document order: texts and attributes, mixed -->
+<div id=order>
+  <p>顺序一</p>
+  <img alt="顺序二">
+  <p>顺序三</p>
+  <input placeholder="顺序四">
+  <p>顺序五</p>
+</div>
+
+<!-- text split across inline elements, numbers and prices -->
+<p id=promo><b>满</b>300<b>减</b>50</p>
+<p id=latin>iPhone<b>手机壳</b></p>
+<p id=pair><span>免费</span><span>送货</span></p>
+<div id=flexpair class=flex><span>包邮</span><span>退货</span></div>
+<p id=spaced>买 <b>二</b> 送 <b>一</b></p>
+<span id=price>¥199.00</span>
+<span id=sold>已售 1.2万+</span>
+<span id=range>¥1,299.00 - ¥2,499.00 起</span>
+
+<!-- select / option -->
+<select id=sel>
+  <option id=o1>红色</option>
+  <option id=o2 value="b" selected>蓝色</option>
+  <optgroup id=og label="尺码"><option id=o3>大号</option></optgroup>
+</select>
+
+<!-- SVG -->
+<svg id=svg width=200 height=40><title id=svgtitle>图表标题</title><text id=svgtext x=0 y=20>销量</text></svg>
+
+<!-- shadow roots attached after the page was scanned; one of them closed -->
+<div id=late></div>
+<late-closed id=closed></late-closed>
+
+<!-- frames -->
+<iframe id=f-same name=f-same src="frame.html"></iframe>
+<iframe id=f-cross name=f-cross></iframe>
+<iframe id=f-srcdoc name=f-srcdoc srcdoc="<p id=ft>内嵌文档</p>"></iframe>
+<iframe id=f-blank name=f-blank></iframe>
+
+<div id=tick1>x</div>
+<div id=tick2></div>
+<div id=static></div>
+<script>
+  document.getElementById('f-cross').src =
+    location.protocol + '//' + (location.hostname === 'localhost' ? '127.0.0.1' : 'localhost') + ':' + location.port + '/frame.html';
+  const blank = document.getElementById('f-blank').contentDocument;
+  blank.open(); blank.write('<p id=ft>空白框架</p>'); blank.close();
+  setTimeout(() => {
+    document.getElementById('late').attachShadow({ mode: 'open' }).innerHTML = '<span id=ls>迟到的影子</span>';
+    // Closed: the page keeps its own reference so the test can read the result.
+    window.__closedRoot = document.getElementById('closed').attachShadow({ mode: 'closed' });
+    window.__closedRoot.innerHTML = '<span id=cs>封闭的影子</span>';
+  }, 1500);
+
+  // Mutation storm, started by the test: a text node rewritten in place and a
+  // container whose content is replaced, both on every tick.
+  window.startStorm = (ticks, interval) => new Promise((resolve) => {
+    const node = document.getElementById('tick1').firstChild;
+    const box = document.getElementById('tick2');
+    let n = 0;
+    const id = setInterval(() => {
+      n++;
+      node.nodeValue = '剩余 ' + n + ' 秒';
+      box.innerHTML = '<b>倒计时 ' + n + ' 秒</b>';
+      if (n === 10) document.getElementById('static').textContent = '静态文本';
+      if (n >= ticks) { clearInterval(id); resolve(n); }
+    }, interval);
+  });
+</script>
+</body>

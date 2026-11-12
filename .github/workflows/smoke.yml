@@ -11,7 +11,12 @@ permissions:
 
 jobs:
   smoke:
-    runs-on: windows-latest
+    # windows-latest is Windows Server 2025 (Windows 11 24H2 code base); 2022 is the Windows 10 code base.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, windows-2022]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 25
     steps:
       - name: Checkout
@@ -46,6 +51,62 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: smoke-results
+          name: smoke-results-${{ matrix.os }}
           path: smoke-out/
+          if-no-files-found: warn
+
+      - name: OCR installation log (repeated for the end of the job log)
+        if: always()
+        shell: powershell
+        run: |
+          if (Test-Path "$env:TEMP\ocr-install.log") { Get-Content "$env:TEMP\ocr-install.log" } else { 'no worker log' }
+
+  # Chrome extension with a real browser and real network: does Chrome's on-device
+  # zh -> en translation (language pack download) actually work?
+  extension:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Playwright
+        run: |
+          npm i playwright ws
+          npx playwright install chromium
+
+      - name: Extension tests with real translation (Chromium)
+        id: chromium
+        shell: pwsh
+        continue-on-error: true
+        timeout-minutes: 8
+        run: |
+          node extension-tests/run.js --real 2>&1 | Tee-Object -FilePath extension-chromium.log
+          $code = $LASTEXITCODE
+          $line = Select-String -Path extension-chromium.log -Pattern 'REAL_TRANSLATION: (\w+)' | Select-Object -Last 1
+          $result = if ($line) { $line.Matches[0].Groups[1].Value } else { 'MISSING' }
+          "result=$result" >> $env:GITHUB_OUTPUT
+          exit $code
+
+      # Plain Chromium may not be able to download the language pack; branded Chrome is preinstalled.
+      - name: Extension tests with real translation (branded Chrome, one retry)
+        if: ${{ !cancelled() && steps.chromium.outputs.result != 'OK' }}
+        shell: pwsh
+        continue-on-error: true
+        timeout-minutes: 8
+        run: |
+          node extension-tests/run.js --real --channel=chrome 2>&1 | Tee-Object -FilePath extension-chrome.log
+          exit $LASTEXITCODE
+
+      - name: Upload extension test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-results
+          path: extension-*.log
           if-no-files-found: warn

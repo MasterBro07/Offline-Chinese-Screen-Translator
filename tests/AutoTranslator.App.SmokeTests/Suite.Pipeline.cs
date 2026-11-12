@@ -186,7 +186,10 @@ internal sealed partial class Suite
             wait.Restart();
             while (wait.Elapsed < TimeSpan.FromSeconds(6) && clear == null)
             {
-                clear = recorder.Snapshot().FirstOrDefault(e => e.Utc >= emptyUtc.AddMilliseconds(-200) && e.Regions == null);
+                // Fallback mode keeps non-Han text, so the window title stays as the only region there.
+                clear = recorder.Snapshot().FirstOrDefault(e => e.Utc >= emptyUtc.AddMilliseconds(-200)
+                    && (e.Regions == null
+                        || (_fallback && e.Regions.All(r => IntersectionArea(r.Bounds, empty.Client) == 0))));
                 if (clear == null)
                 {
                     await Task.Delay(40);
@@ -195,7 +198,7 @@ internal sealed partial class Suite
 
             await Task.Delay(300);
             double clearLatency = clear != null ? (clear.Utc - emptyUtc).TotalMilliseconds : -1;
-            Report.Check(clear != null && clearLatency <= 2000 && !Native.IsWindowVisible(overlayHwnd),
+            Report.Check(clear != null && clearLatency <= 2000 && (_fallback || !Native.IsWindowVisible(overlayHwnd)),
                 Name + ": overlay disappears when the text is gone" + Tag,
                 clear != null
                     ? "cleared " + Report.F(clearLatency) + " ms after the text was removed; overlay window visible: "

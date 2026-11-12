@@ -1,0 +1,19 @@
+<!doctype html><meta charset=utf-8><title>测试页面</title>
+<body>
+<h1 id=h>  你好世界  </h1>
+<p id=mixed>Hello <b id=b>中文</b> text</p>
+<p id=en>English only</p>
+<p id=titled title="own title">有标题</p>
+<input id=inp value="用户输入">
+<input id=pw type=password value="密码" placeholder="密码">
+<input id=ph placeholder="请输入">
+<textarea id=ta placeholder="占位">文本区域</textarea>
+<input id=btn type=submit value="提交">
+<img id=img alt="图片">
+<div id=ce contenteditable=true>可编辑</div>
+<pre id=pre>代码</pre>
+<div id=host></div>
+<div id=dyn></div>
+<script>
+  document.getElementById('host').attachShadow({mode:'open'}).innerHTML = '<span id=sh>影子</span>';
+</script>

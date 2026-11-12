@@ -1,6 +1,7 @@
 name: Smoke
 
 # Runs the desktop app for real on a Windows runner: capture, OCR, overlay, bridge, shipped exe.
+# The checks print [PASS] / [FAIL] / [SKIP] lines; logs and screenshots are uploaded as artifacts.
 on:
   push:
   workflow_dispatch:
@@ -16,15 +17,35 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Chinese OCR recognizer (best effort)
+      # Takes minutes on a hosted runner, so it runs in the background while the app is built.
+      - name: Start installing the Chinese OCR recognizer (background, best effort)
         shell: powershell
-        run: ./tests/smoke/Install-ChineseOcr.ps1
+        run: ./tests/smoke/Install-ChineseOcr.ps1 -Start
 
-      - name: Desktop session probe
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      # Exactly the publish command of build.yml: the smoke tests start this exe.
+      - name: Publish desktop app
+        run: dotnet publish src/AutoTranslator.App -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+
+      - name: Build smoke tests
+        run: dotnet build tests/AutoTranslator.App.SmokeTests -c Release -o smoke-bin
+
+      - name: Wait for the Chinese OCR recognizer
         shell: powershell
-        run: |
-          Get-CimInstance Win32_OperatingSystem | Format-List Caption, Version, BuildNumber
-          Get-CimInstance Win32_VideoController | Format-List Name, CurrentHorizontalResolution, CurrentVerticalResolution
-          "Session: $([Diagnostics.Process]::GetCurrentProcess().SessionId)  Interactive: $([Environment]::UserInteractive)  User: $env:USERNAME"
-          Get-Process dwm, explorer, winlogon -ErrorAction SilentlyContinue | Format-Table Name, Id, SessionId
-          Get-ChildItem C:\Windows\Fonts | Where-Object { $_.Name -match '^(msyh|simsun|simhei|msjh|deng|segoeui)' } | Format-Table Name, Length
+        run: ./tests/smoke/Install-ChineseOcr.ps1 -Wait -TimeoutSeconds 600
+
+      - name: Run smoke tests
+        timeout-minutes: 12
+        run: ./smoke-bin/AutoTranslator.App.SmokeTests.exe --out smoke-out --exe publish/AutoTranslator.exe
+
+      - name: Upload logs and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-results
+          path: smoke-out/
+          if-no-files-found: warn

@@ -27,6 +27,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- tests/AutoTranslator.App.SmokeTests runs the internal capture/OCR/overlay classes on a real desktop -->
+    <InternalsVisibleTo Include="AutoTranslator.App.SmokeTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\AutoTranslator.Core\AutoTranslator.Core.csproj" />
   </ItemGroup>
 

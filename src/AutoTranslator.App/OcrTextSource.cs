@@ -28,6 +28,11 @@ internal sealed class OcrTextSource : ITextSource, IRefreshableTextSource
     private static readonly TimeSpan ForcedRefreshInterval = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan EngineRetryInterval = TimeSpan.FromSeconds(15);
 
+    // Test seams for tests/AutoTranslator.App.SmokeTests (CI runners often have no Chinese OCR
+    // pack): use another recognizer language and keep non-Han text. Never set in production.
+    internal static string? TestLanguageTag;
+    internal static bool TestKeepNonHanText;
+
     private static readonly object AvailabilityGate = new object();
     private static DateTime _availabilityCheckedUtc = DateTime.MinValue;
     private static bool _availabilityCached;
@@ -330,7 +335,7 @@ internal sealed class OcrTextSource : ITextSource, IRefreshableTextSource
         ScreenRect origin, FrameScale scale)
     {
         string value = text.ToString().Trim();
-        if (value.Length == 0 || !ScriptDetector.ContainsHan(value))
+        if (value.Length == 0 || (!TestKeepNonHanText && !ScriptDetector.ContainsHan(value)))
         {
             return;
         }
@@ -377,6 +382,11 @@ internal sealed class OcrTextSource : ITextSource, IRefreshableTextSource
 
     private static OcrEngine? CreateEngine()
     {
+        if (TestLanguageTag != null)
+        {
+            return TryCreate(TestLanguageTag);
+        }
+
         foreach (string tag in PreferredLanguageTags)
         {
             OcrEngine? engine = TryCreate(tag);

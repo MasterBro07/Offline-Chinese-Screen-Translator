@@ -295,6 +295,12 @@ public sealed class ClaudeTranslator : ITranslator
         {
             throw new TimeoutException("Zeitüberschreitung bei Claude");
         }
+        catch (OperationCanceledException)
+        {
+            // The SDK's own timer can fire just before ours. The caller did not cancel, so this is
+            // a timeout too; letting it through as a cancellation would end the batch without a result.
+            throw new TimeoutException("Zeitüberschreitung bei Claude");
+        }
         catch (AnthropicUnauthorizedException ex)
         {
             throw new InvalidOperationException("Claude-API-Schlüssel ist ungültig", ex);

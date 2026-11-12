@@ -23,6 +23,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Kestrel for the local fake of the Anthropic Messages API -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\AutoTranslator.Core\AutoTranslator.Core.csproj" />
   </ItemGroup>
 

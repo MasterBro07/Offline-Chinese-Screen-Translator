@@ -127,9 +127,10 @@ public sealed class TranslationPipeline : IAsyncDisposable
         var captured = await _source.CaptureAsync(ct).ConfigureAwait(false);
         if (captured is not null)
         {
-            _lastHanRegions = captured
+            IReadOnlyList<TextRegion> han = captured
                 .Where(r => r is not null && ScriptDetector.ContainsHan(r.Text))
                 .ToList();
+            _lastHanRegions = _options.MergeLines ? RegionMerger.MergeLines(han) : han;
             _retryLastCapture = true;
         }
         else if (!_retryLastCapture || _lastHanRegions is null)

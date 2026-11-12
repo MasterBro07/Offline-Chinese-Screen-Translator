@@ -22,11 +22,26 @@ public sealed class ChromeBridgeServer : ITranslator, IAsyncDisposable
     private const string BridgePath = "/bridge";
     private const string AllowedOriginPrefix = "chrome-extension://";
     private const int MaxMessageBytes = 16 * 1024 * 1024;
+    private const int MaxConcurrentPageRequests = 4;   // handler calls running at once, per client
+    private const int MaxQueuedPageRequests = 32;      // accepted but unanswered, per client
+    private const int MaxPageItems = 200;
+    private const int MaxPageChars = 20000;
 
     private sealed class Client
     {
-        public Client(WebSocket socket) => Socket = socket;
+        public Client(WebSocket socket, string origin)
+        {
+            Socket = socket;
+            Origin = origin;
+        }
+
         public WebSocket Socket { get; }
+        public string Origin { get; }
+        /// <summary>Protocol version from the client's hello; 0 until it said hello.</summary>
+        public int Version;
+        /// <summary>page-translate requests accepted and not yet answered.</summary>
+        public int PageRequests;
+        public SemaphoreSlim PageGate { get; } = new(MaxConcurrentPageRequests, MaxConcurrentPageRequests);
         public SemaphoreSlim SendLock { get; } = new(1, 1);
         public CancellationTokenSource Cts { get; } = new();
         public TaskCompletionSource ReceiveDone { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -46,6 +61,8 @@ public sealed class ChromeBridgeServer : ITranslator, IAsyncDisposable
     private Client? _client;
     private long _nextId;
     private int _port;
+    private volatile bool _offersPremiumEngine;
+    private string? _trustedOrigin;
     private (bool Ready, string Text) _lastStatus = (false, NotConnectedText);
 
     private const string NotConnectedText = "Chrome-Erweiterung nicht verbunden";
@@ -76,6 +93,49 @@ public sealed class ChromeBridgeServer : ITranslator, IAsyncDisposable
     {
         get { lock (_clientLock) return _client is { Ready: true }; }
     }
+
+    /// <summary>
+    /// True when the app can translate page text with a better engine than the on-device one.
+    /// Drives <c>app-state.premium</c>; version 2 clients are told about every change.
+    /// </summary>
+    public bool OffersPremiumEngine
+    {
+        get => _offersPremiumEngine;
+        set
+        {
+            Client? client;
+            lock (_clientLock)
+            {
+                if (_offersPremiumEngine == value) return;
+                _offersPremiumEngine = value;
+                client = _client;
+            }
+            if (client is not null) _ = SendAppStateAsync(client);
+        }
+    }
+
+    /// <summary>Engine name reported in <c>app-state.engine</c> while <see cref="OffersPremiumEngine"/> is true.</summary>
+    public string PremiumEngineName { get; set; } = "claude";
+
+    /// <summary>
+    /// The only extension origin whose <c>page-translate</c> requests are served, because they spend
+    /// the user's API credit. Null: the first origin that connects gets pinned.
+    /// </summary>
+    public string? TrustedOrigin
+    {
+        get { lock (_clientLock) return _trustedOrigin; }
+        set { lock (_clientLock) _trustedOrigin = string.IsNullOrWhiteSpace(value) ? null : NormalizeOrigin(value); }
+    }
+
+    /// <summary>Raised once when an origin gets pinned, with that origin; store it in the settings.</summary>
+    public event Action<string>? OriginPinned;
+
+    /// <summary>
+    /// Translates page text for the extension: (texts, source, target, ct) → translations in the
+    /// same order and number. Called concurrently.
+    /// </summary>
+    public Func<IReadOnlyList<string>, string, string, CancellationToken, Task<IReadOnlyList<string>>>?
+        PageTranslateHandler { get; set; }
 
     public string StatusText
     {
@@ -242,15 +302,22 @@ public sealed class ChromeBridgeServer : ITranslator, IAsyncDisposable
         }
 
         using var socket = await context.WebSockets.AcceptWebSocketAsync().ConfigureAwait(false);
-        var client = new Client(socket);
+        var client = new Client(socket, NormalizeOrigin(origin));
 
         Client? previous;
+        string? pinned = null;
         lock (_clientLock)
         {
             previous = _client;
             _client = client;
+            // Trust on first use: the first extension that connects may spend API credit.
+            if (_trustedOrigin is null) pinned = _trustedOrigin = client.Origin;
         }
         if (previous is not null) _ = CloseClientAsync(previous, "replaced by a new connection");
+        if (pinned is not null)
+        {
+            try { OriginPinned?.Invoke(pinned); } catch { /* listener errors are not ours */ }
+        }
         NotifyStatus();
 
         var pingTask = PingLoopAsync(client);
@@ -320,7 +387,8 @@ public sealed class ChromeBridgeServer : ITranslator, IAsyncDisposable
             var root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object) return;
 
-            switch (GetString(root, "type"))
+            var type = GetString(root, "type");
+            switch (type)
             {
                 case "hello":
                 case "status":
@@ -330,8 +398,20 @@ public sealed class ChromeBridgeServer : ITranslator, IAsyncDisposable
                     {
                         client.Ready = ready;
                         client.Detail = detail;
+                        if (type == "hello")
+                        {
+                            client.Version = root.TryGetProperty("version", out var v)
+                                             && v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var version)
+                                ? Math.Max(1, version)
+                                : 1;
+                        }
                     }
                     NotifyStatus();
+                    if (type == "hello") await SendAppStateAsync(client).ConfigureAwait(false);
+                    break;
+
+                case "page-translate":
+                    HandlePageTranslate(client, root);
                     break;
 
                 case "result":
@@ -371,6 +451,166 @@ public sealed class ChromeBridgeServer : ITranslator, IAsyncDisposable
             }
         }
     }
+
+    /// <summary>Tells a version 2 client whether page text can be translated through the app.</summary>
+    private async Task SendAppStateAsync(Client client)
+    {
+        // Version 1 clients do not know the message; clients that have not said hello get it after their hello.
+        if (Volatile.Read(ref client.Version) < 2 || client.Closed) return;
+        try
+        {
+            // Read the flag inside the send lock so the last frame on the wire carries the latest value.
+            await client.SendLock.WaitAsync(client.Cts.Token).ConfigureAwait(false);
+            try
+            {
+                var premium = _offersPremiumEngine;
+                var message = JsonSerializer.SerializeToUtf8Bytes(new
+                {
+                    type = "app-state",
+                    premium,
+                    engine = premium ? PremiumEngineName : "chrome",
+                });
+                await client.Socket.SendAsync(message.AsMemory(), WebSocketMessageType.Text, true, client.Cts.Token)
+                    .ConfigureAwait(false);
+            }
+            finally
+            {
+                client.SendLock.Release();
+            }
+        }
+        catch
+        {
+            // The receive loop notices a dead socket by itself.
+        }
+    }
+
+    /// <summary>Validates a page-translate request and starts it; never blocks the receive loop.</summary>
+    private void HandlePageTranslate(Client client, JsonElement root)
+    {
+        if (!root.TryGetProperty("id", out var idElement)) return; // nothing to answer to
+        var id = idElement.ValueKind == JsonValueKind.String ? idElement.GetString() : idElement.GetRawText();
+        if (string.IsNullOrEmpty(id)) return;
+
+        var handler = PageTranslateHandler;
+        if (handler is null || !_offersPremiumEngine)
+        {
+            _ = SendPageErrorAsync(client, id, "Die bessere Übersetzung ist in der App nicht aktiv.");
+            return;
+        }
+
+        bool trusted;
+        lock (_clientLock) trusted = string.Equals(_trustedOrigin, client.Origin, StringComparison.OrdinalIgnoreCase);
+        if (!trusted)
+        {
+            _ = SendPageErrorAsync(client, id, "Diese Erweiterung ist in der App nicht freigegeben.");
+            return;
+        }
+
+        if (!TryReadPageTexts(root, out var texts))
+        {
+            _ = SendPageErrorAsync(client, id,
+                $"Ungültige Anfrage: höchstens {MaxPageItems} Texte mit zusammen {MaxPageChars} Zeichen.");
+            return;
+        }
+
+        if (Interlocked.Increment(ref client.PageRequests) > MaxQueuedPageRequests)
+        {
+            Interlocked.Decrement(ref client.PageRequests);
+            _ = SendPageErrorAsync(client, id, "Zu viele gleichzeitige Anfragen.");
+            return;
+        }
+
+        var source = GetString(root, "source") ?? "zh";
+        var target = GetString(root, "target") ?? "en";
+        _ = Task.Run(() => RunPageTranslateAsync(client, handler, id, texts, source, target));
+    }
+
+    private async Task RunPageTranslateAsync(Client client,
+        Func<IReadOnlyList<string>, string, string, CancellationToken, Task<IReadOnlyList<string>>> handler,
+        string id, List<string> texts, string source, string target)
+    {
+        try
+        {
+            IReadOnlyList<string> translations;
+            if (texts.Count == 0)
+            {
+                translations = Array.Empty<string>();
+            }
+            else
+            {
+                var ct = client.Cts.Token;
+                await client.PageGate.WaitAsync(ct).ConfigureAwait(false);
+                try
+                {
+                    translations = await handler(texts, source, target, ct).ConfigureAwait(false);
+                }
+                finally
+                {
+                    client.PageGate.Release();
+                }
+            }
+
+            if (translations is null || translations.Count != texts.Count)
+            {
+                await SendPageErrorAsync(client, id, "Übersetzer lieferte eine unerwartete Anzahl von Ergebnissen.")
+                    .ConfigureAwait(false);
+                return;
+            }
+
+            var message = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                type = "page-result",
+                id,
+                translations = translations.Select(t => t ?? ""),
+            });
+            await SendAsync(client, message, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            if (client.Closed) return; // nobody left to tell
+            await SendPageErrorAsync(client, id,
+                string.IsNullOrWhiteSpace(ex.Message) || ex is OperationCanceledException
+                    ? "Übersetzung fehlgeschlagen."
+                    : ex.Message).ConfigureAwait(false);
+        }
+        finally
+        {
+            Interlocked.Decrement(ref client.PageRequests);
+        }
+    }
+
+    private static async Task SendPageErrorAsync(Client client, string id, string text)
+    {
+        try
+        {
+            var message = JsonSerializer.SerializeToUtf8Bytes(new { type = "page-error", id, message = text });
+            await SendAsync(client, message, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch
+        {
+            // The receive loop notices a dead socket by itself.
+        }
+    }
+
+    /// <summary>Reads "texts": an array of strings within the size limits.</summary>
+    private static bool TryReadPageTexts(JsonElement root, out List<string> texts)
+    {
+        texts = new List<string>();
+        if (!root.TryGetProperty("texts", out var array) || array.ValueKind != JsonValueKind.Array) return false;
+        if (array.GetArrayLength() > MaxPageItems) return false;
+        long chars = 0;
+        foreach (var item in array.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.String) return false;
+            var text = item.GetString() ?? "";
+            chars += text.Length;
+            if (chars > MaxPageChars) return false;
+            texts.Add(text);
+        }
+        return true;
+    }
+
+    private static string NormalizeOrigin(string origin) => origin.Trim().TrimEnd('/');
 
     private Pending? TakePending(Client client, JsonElement root)
     {

@@ -5,11 +5,18 @@ public sealed class CachingTranslator : ITranslator
 {
     private readonly ITranslator _inner;
     private readonly TranslationCache _cache;
+    private readonly string? _engineTag;
 
-    public CachingTranslator(ITranslator inner, TranslationCache cache)
+    /// <param name="inner">The engine asked for cache misses.</param>
+    /// <param name="cache">Shared translation cache.</param>
+    /// <param name="engineTag">
+    /// Appended to the cache's target key ("en|claude") so different engines do not share entries.
+    /// </param>
+    public CachingTranslator(ITranslator inner, TranslationCache cache, string? engineTag = null)
     {
         _inner = inner ?? throw new ArgumentNullException(nameof(inner));
         _cache = cache ?? throw new ArgumentNullException(nameof(cache));
+        _engineTag = string.IsNullOrWhiteSpace(engineTag) ? null : engineTag.Trim();
     }
 
     public bool IsReady => _inner.IsReady;
@@ -26,6 +33,7 @@ public sealed class CachingTranslator : ITranslator
         IReadOnlyList<string> texts, string sourceLanguage, string targetLanguage, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(texts);
+        var cacheTarget = _engineTag is null ? targetLanguage : targetLanguage + "|" + _engineTag;
         var results = new string[texts.Count];
         var missTexts = new List<string>();
         var missIndexes = new Dictionary<string, List<int>>(StringComparer.Ordinal);
@@ -37,7 +45,7 @@ public sealed class CachingTranslator : ITranslator
             {
                 results[i] = text ?? string.Empty;
             }
-            else if (_cache.TryGet(sourceLanguage, targetLanguage, text, out var cached))
+            else if (_cache.TryGet(sourceLanguage, cacheTarget, text, out var cached))
             {
                 results[i] = cached;
             }
@@ -65,7 +73,7 @@ public sealed class CachingTranslator : ITranslator
         {
             var translation = translated[m] ?? string.Empty;
             // Empty answers are not worth remembering; they are most likely engine hiccups.
-            if (translation.Length > 0) _cache.Set(sourceLanguage, targetLanguage, missTexts[m], translation);
+            if (translation.Length > 0) _cache.Set(sourceLanguage, cacheTarget, missTexts[m], translation);
             foreach (var i in missIndexes[missTexts[m]]) results[i] = translation;
         }
         return results;

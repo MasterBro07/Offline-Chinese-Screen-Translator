@@ -144,8 +144,9 @@ public partial class App : Application, ISettingsHost
         _claude = new ClaudeTranslator(_keyStore.Get, claudeOptions, _usage);
 
         _chromeTranslator = new CachingTranslator(_bridge, _cache);
-        _claudeTranslator = new CachingTranslator(new FallbackTranslator(_claude, _bridge), _cache, CacheTagClaude);
         _claudePageTranslator = new CachingTranslator(_claude, _cache, CacheTagClaude);
+        // Each engine caches under its own tag, so a Chrome fallback result is never stored as a Claude one.
+        _claudeTranslator = new FallbackTranslator(_claudePageTranslator, _chromeTranslator);
         ApplyEngineState();
 
         // Subscribed at the two real engines, so every wrapper combination is covered.

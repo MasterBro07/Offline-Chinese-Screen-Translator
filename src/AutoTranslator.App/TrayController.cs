@@ -14,6 +14,9 @@ internal sealed class TrayController : IDisposable
     public const string ModeUiAutomation = "UiAutomation";
     public const string ModeBoth = "Both";
 
+    public const string EngineChrome = "Chrome";
+    public const string EngineClaude = "Claude";
+
     private const int MaxTooltipLength = 63; // NotifyIcon.Text limit
 
     private readonly NotifyIcon _notifyIcon;
@@ -25,12 +28,16 @@ internal sealed class TrayController : IDisposable
     private readonly ToolStripMenuItem _scopeWindowItem;
     private readonly ToolStripMenuItem _scopeMonitorItem;
     private readonly ToolStripMenuItem _statusItem;
+    private readonly ToolStripMenuItem _engineMenu;
+    private readonly ToolStripMenuItem _engineChromeItem;
+    private readonly ToolStripMenuItem _engineClaudeItem;
 
     private readonly Icon _activeIcon;
     private readonly Icon _pausedIcon;
     private readonly IntPtr _activeIconHandle;
     private readonly IntPtr _pausedIconHandle;
     private bool _disposed;
+    private volatile bool _menuOpen;
 
     public TrayController()
     {
@@ -46,6 +53,15 @@ internal sealed class TrayController : IDisposable
         _modeUiaItem.Click += (sender, e) => Raise(ModeSelected, ModeUiAutomation);
         _modeBothItem = new ToolStripMenuItem("Beides");
         _modeBothItem.Click += (sender, e) => Raise(ModeSelected, ModeBoth);
+
+        _engineChromeItem = new ToolStripMenuItem("Chrome (kostenlos, auf diesem PC)");
+        _engineChromeItem.Click += (sender, e) => Raise(EngineSelected, EngineChrome);
+        _engineClaudeItem = new ToolStripMenuItem("Claude Haiku (bessere Qualität, eigener API-Schlüssel)");
+        _engineClaudeItem.Click += (sender, e) => Raise(EngineSelected, EngineClaude);
+
+        _engineMenu = new ToolStripMenuItem("Übersetzer: Chrome");
+        _engineMenu.DropDownItems.Add(_engineChromeItem);
+        _engineMenu.DropDownItems.Add(_engineClaudeItem);
 
         var modeMenu = new ToolStripMenuItem("Texterkennung");
         modeMenu.DropDownItems.Add(_modeOcrItem);
@@ -64,6 +80,14 @@ internal sealed class TrayController : IDisposable
         _statusItem = new ToolStripMenuItem("Status: wird gestartet …");
         _statusItem.Enabled = false;
 
+        var settingsItem = new ToolStripMenuItem("Einstellungen…");
+        settingsItem.Click += (sender, e) => Raise(SettingsRequested);
+
+        var repairItem = new ToolStripMenuItem("Erweiterung neu koppeln");
+        repairItem.ToolTipText = "Vergisst die bisher gekoppelte Chrome-Erweiterung. "
+            + "Die nächste Erweiterung, die sich verbindet, darf Webseiten mit Claude übersetzen.";
+        repairItem.Click += (sender, e) => Raise(RepairRequested);
+
         var helpItem = new ToolStripMenuItem("Einrichtung / Hilfe…");
         helpItem.Click += (sender, e) => Raise(HelpRequested);
 
@@ -71,12 +95,18 @@ internal sealed class TrayController : IDisposable
         exitItem.Click += (sender, e) => Raise(ExitRequested);
 
         _menu = new ContextMenuStrip();
+        _menu.ShowItemToolTips = true;
+        _menu.Opened += (sender, e) => _menuOpen = true;
+        _menu.Closed += (sender, e) => _menuOpen = false;
         _menu.Items.Add(_enabledItem);
+        _menu.Items.Add(_engineMenu);
         _menu.Items.Add(modeMenu);
         _menu.Items.Add(scopeMenu);
         _menu.Items.Add(new ToolStripSeparator());
         _menu.Items.Add(_statusItem);
         _menu.Items.Add(new ToolStripSeparator());
+        _menu.Items.Add(settingsItem);
+        _menu.Items.Add(repairItem);
         _menu.Items.Add(helpItem);
         _menu.Items.Add(exitItem);
 
@@ -94,19 +124,53 @@ internal sealed class TrayController : IDisposable
 
     public event EventHandler<string>? ScopeSelected;
 
+    public event EventHandler<string>? EngineSelected;
+
+    public event EventHandler? SettingsRequested;
+
+    public event EventHandler? RepairRequested;
+
     public event EventHandler? HelpRequested;
 
     public event EventHandler? ExitRequested;
 
-    /// <summary>Refreshes check marks, status line, icon and tooltip.</summary>
-    public void Update(bool enabled, string mode, string scope, string status)
+    /// <summary>True while the tray menu is open. May be read from any thread.</summary>
+    public bool IsMenuOpen
+    {
+        get { return _menuOpen; }
+    }
+
+    /// <summary>Refreshes check marks, engine line, status line, icon and tooltip.</summary>
+    /// <param name="engine">Selected engine (<see cref="EngineChrome"/> or <see cref="EngineClaude"/>).</param>
+    /// <param name="engineLabel">Short name of the engine that is translating right now, e.g. "Claude".</param>
+    /// <param name="hotkeyAvailable">False when Ctrl+Alt+T is taken by another program.</param>
+    public void Update(bool enabled, string mode, string scope, string engine, string engineLabel,
+                       string status, bool hotkeyAvailable)
     {
         if (_disposed)
         {
             return;
         }
 
+        string enabledText = hotkeyAvailable
+            ? "Übersetzung aktiv (Strg+Alt+T)"
+            : "Übersetzung aktiv (Strg+Alt+T ist belegt – hier klicken)";
+        if (_enabledItem.Text != enabledText)
+        {
+            _enabledItem.Text = enabledText;
+        }
+
         _enabledItem.Checked = enabled;
+
+        bool claude = string.Equals(engine, EngineClaude, StringComparison.OrdinalIgnoreCase);
+        _engineClaudeItem.Checked = claude;
+        _engineChromeItem.Checked = !claude;
+        string engineLine = "Übersetzer: " + engineLabel;
+        if (_engineMenu.Text != engineLine)
+        {
+            _engineMenu.Text = engineLine;
+        }
+
         _modeOcrItem.Checked = string.Equals(mode, ModeOcr, StringComparison.OrdinalIgnoreCase);
         _modeUiaItem.Checked = string.Equals(mode, ModeUiAutomation, StringComparison.OrdinalIgnoreCase);
         _modeBothItem.Checked = string.Equals(mode, ModeBoth, StringComparison.OrdinalIgnoreCase);
@@ -127,7 +191,8 @@ internal sealed class TrayController : IDisposable
             _notifyIcon.Icon = icon;
         }
 
-        string tooltip = Truncate("AutoTranslator – " + status, MaxTooltipLength);
+        // The tooltip is limited to 63 characters, so the engine goes first and stays short.
+        string tooltip = Truncate("AutoTranslator · " + engineLabel + " · " + status, MaxTooltipLength);
         if (_notifyIcon.Text != tooltip)
         {
             _notifyIcon.Text = tooltip;

@@ -473,7 +473,8 @@ public sealed class ChromeBridgeServer : ITranslator, IAsyncDisposable
         try { client.Cts.Cancel(); } catch (ObjectDisposedException) { }
         if (!finished)
         {
-            try { client.Socket.Abort(); } catch (ObjectDisposedException) { }
+            // Abort can throw when the request finished concurrently; there is nothing left to abort then.
+            try { client.Socket.Abort(); } catch { }
         }
     }
 

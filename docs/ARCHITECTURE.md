@@ -216,3 +216,21 @@ public sealed class ChromeBridgeServer {      // additions
 `ClaudeTranslator` sends one request per batch with all texts as a JSON array and asks for a
 JSON array of the same length (structured output), telling the model the lines come from one
 screen/page, may contain OCR errors, and must be translated to natural, concise English.
+
+## Overlay window and screen capture
+
+The overlay must be click-through, visible to the user and invisible to the app's own screen
+capture (otherwise OCR reads the translations and the overlay flickers in a feedback loop).
+`OverlayWindow.CreateInitialized()` picks the mechanism at start-up:
+
+| Windows | Window | Hidden from capture by |
+|---|---|---|
+| 11 / Server 2025 (build ≥ 22000) | WPF layered window (`AllowsTransparency`) | `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)` |
+| 10 2004+ / Server 2022 | DWM-transparent window (`DwmExtendFrameIntoClientArea`, transparent composition target, `WS_EX_LAYERED` kept by a window-procedure guard) | `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)` |
+| exclusion refused for the layered window | falls back to the DWM-transparent window | as above |
+| exclusion refused altogether (e.g. Windows 10 before 2004) | DWM-transparent window | `ICaptureShield`: the overlay is DWM-cloaked for the duration of each `ScreenCapture.Capture` (about two frames, slight flicker) |
+
+On Windows 10 `SetWindowDisplayAffinity` fails with error 8 for windows drawn with
+`UpdateLayeredWindow`, which is what WPF does for `AllowsTransparency`. All four rows are
+exercised by `tests/AutoTranslator.App.SmokeTests` (workflow `smoke.yml`, Windows Server 2022
+and 2025 runners; the last two rows through test seams).

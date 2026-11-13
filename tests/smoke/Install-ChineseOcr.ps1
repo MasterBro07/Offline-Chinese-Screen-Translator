@@ -95,6 +95,30 @@ if ($Wait) {
         }
     }
 
+    # An unfinished or interrupted installation keeps the servicing stack (TiWorker) busy and
+    # makes the timing checks of the smoke tests meaningless: wait until the machine is calm.
+    function Get-ServicingCpu {
+        $sum = 0.0
+        Get-Process -Name TiWorker, TrustedInstaller, Dism, DismHost -ErrorAction SilentlyContinue | ForEach-Object { $sum += $_.CPU }
+        return $sum
+    }
+    $settle = [Diagnostics.Stopwatch]::StartNew()
+    $calm = 0
+    $last = 'n/a'
+    while ($settle.Elapsed.TotalSeconds -lt 300 -and $calm -lt 3) {
+        try {
+            $before = Get-ServicingCpu
+            $total = (Get-Counter '\Processor(_Total)\% Processor Time' -SampleInterval 5 -MaxSamples 1 -ErrorAction Stop).CounterSamples[0].CookedValue
+            $servicing = (Get-ServicingCpu) - $before
+            $last = ('{0:n0} % total CPU, servicing processes used {1:n1} s CPU in 5 s' -f $total, $servicing)
+            if ($total -lt 35 -and $servicing -lt 0.5) { $calm++ } else { $calm = 0 }
+        } catch {
+            $last = "CPU counter unavailable: $($_.Exception.Message)"
+            break
+        }
+    }
+    Write-Host ("Machine load after {0:n0} s of settling: {1}" -f $settle.Elapsed.TotalSeconds, $last)
+
     Write-Host ("Waited {0:n0} s. Worker log:" -f $watch.Elapsed.TotalSeconds)
     if (Test-Path $logFile) { Get-Content $logFile | ForEach-Object { Write-Host "  $_" } }
     Write-Host "OCR recognizers after: $((Get-OcrLanguages) -join ', ')"

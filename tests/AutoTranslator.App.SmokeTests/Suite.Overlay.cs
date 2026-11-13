@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Interop;
 using AutoTranslator.Core;
@@ -131,6 +132,17 @@ internal sealed partial class Suite
             bool cleared = Native.SetWindowDisplayAffinity(hwnd, Native.WDA_NONE);
             await Task.Delay(500);
             Shot visible = Shots.Grab(screen);
+
+            // A busy runner can present the first frame late; the delay is reported, a missing frame still fails.
+            System.Diagnostics.Stopwatch drawWait = System.Diagnostics.Stopwatch.StartNew();
+            while (drawWait.Elapsed < TimeSpan.FromSeconds(8)
+                   && regions.Any(r => Shots.Diff(baseline, visible, 24, null, r.Bounds).ChangedPixels == 0))
+            {
+                await Task.Delay(250);
+                visible = Shots.Grab(screen);
+            }
+
+            double drawnAfterMs = 500 + drawWait.Elapsed.TotalMilliseconds;
             Shots.Save(visible, "04-overlay-2-shown-capture-exclusion-off");
 
             ShotDiff elsewhere = Shots.Diff(baseline, visible, 24, expected, client);
@@ -152,7 +164,8 @@ internal sealed partial class Suite
             }
 
             Report.Check(boxesOk, Name + ": dark boxes with light text at the expected positions",
-                "position error " + maxError + " px (limit 2); " + string.Join("; ", details));
+                "position error " + maxError + " px (limit 2); " + string.Join("; ", details)
+                + (drawnAfterMs > 600 ? "; on screen only " + Report.F(drawnAfterMs) + " ms after capture exclusion was switched off" : string.Empty));
             Report.Check(elsewhere.ChangedPixels == 0, Name + ": nothing drawn anywhere else",
                 "outside the two boxes: " + elsewhere);
 

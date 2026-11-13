@@ -29,6 +29,18 @@ internal sealed class OverlayWindow : Window, IOverlayPresenter
     private readonly FontFamily _fontFamily = new FontFamily("Segoe UI");
     private readonly Typeface _typeface;
 
+    // Windows 10 (and Server 2022) cannot hide a WPF "AllowsTransparency" window from screen
+    // capture: SetWindowDisplayAffinity fails with error 8 for windows drawn with
+    // UpdateLayeredWindow, and the app then reads and re-translates its own overlay. There the
+    // window is made transparent through DWM instead (see OnSourceInitialized). Windows 11 keeps
+    // the plain WPF way. Both ways are verified by tests/AutoTranslator.App.SmokeTests.
+    private const int FirstWindows11Build = 22000;
+
+    /// <summary>Smoke-test seam: force one of the two transparency techniques. Never set in production.</summary>
+    internal static bool? TestUseWpfLayeredWindow;
+
+    private readonly bool _wpfLayered;
+
     private IntPtr _hwnd;
     private int _originX;
     private int _originY;
@@ -45,7 +57,8 @@ internal sealed class OverlayWindow : Window, IOverlayPresenter
         Title = "AutoTranslator Overlay";
         WindowStyle = WindowStyle.None;
         ResizeMode = ResizeMode.NoResize;
-        AllowsTransparency = true;
+        _wpfLayered = TestUseWpfLayeredWindow ?? Environment.OSVersion.Version.Build >= FirstWindows11Build;
+        AllowsTransparency = _wpfLayered;
         Background = Brushes.Transparent;
         Topmost = true;
         ShowInTaskbar = false;
@@ -150,12 +163,36 @@ internal sealed class OverlayWindow : Window, IOverlayPresenter
         base.OnSourceInitialized(e);
         _hwnd = new WindowInteropHelper(this).Handle;
 
+        if (!_wpfLayered)
+        {
+            // Per-pixel transparency without UpdateLayeredWindow: WPF renders onto a transparent
+            // back buffer and DWM is told that the whole client area is "glass".
+            HwndSource? hwndSource = HwndSource.FromHwnd(_hwnd);
+            if (hwndSource != null && hwndSource.CompositionTarget != null)
+            {
+                hwndSource.CompositionTarget.BackgroundColor = Colors.Transparent;
+            }
+
+            var margins = new NativeMethods.MARGINS { Left = -1, Right = -1, Top = -1, Bottom = -1 };
+            int hr = NativeMethods.DwmExtendFrameIntoClientArea(_hwnd, ref margins);
+            if (hr != 0)
+            {
+                Log.Error("DwmExtendFrameIntoClientArea failed, HRESULT 0x" + hr.ToString("X8"));
+            }
+        }
+
         long exStyle = NativeMethods.GetWindowLongValue(_hwnd, NativeMethods.GWL_EXSTYLE);
         exStyle |= NativeMethods.WS_EX_TRANSPARENT
                    | NativeMethods.WS_EX_LAYERED
                    | NativeMethods.WS_EX_TOOLWINDOW
                    | NativeMethods.WS_EX_NOACTIVATE;
         NativeMethods.SetWindowLongValue(_hwnd, NativeMethods.GWL_EXSTYLE, exStyle);
+        if (!_wpfLayered)
+        {
+            // WS_EX_LAYERED is needed for click-through; a layered window stays invisible until
+            // its attributes are set.
+            NativeMethods.SetLayeredWindowAttributes(_hwnd, 0, 255, NativeMethods.LWA_ALPHA);
+        }
 
         // Essential: hide the overlay from screen capture, otherwise OCR would read (and cover)
         // our own translations instead of the original text.
@@ -163,7 +200,7 @@ internal sealed class OverlayWindow : Window, IOverlayPresenter
         {
             Log.Error("SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE) failed, error "
                       + System.Runtime.InteropServices.Marshal.GetLastWin32Error()
-                      + ". Windows 10 version 2004 or newer is required.");
+                      + ". The overlay is visible to screen capture; OCR will read the translations.");
         }
 
         ApplyBounds();

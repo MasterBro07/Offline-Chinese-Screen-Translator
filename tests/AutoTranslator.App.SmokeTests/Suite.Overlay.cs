@@ -13,7 +13,33 @@ internal sealed partial class Suite
 
     private async Task CheckOverlayAsync()
     {
-        const string Name = "4 overlay";
+        bool defaultWpfLayered = Environment.OSVersion.Version.Build >= 22000;
+        Report.Info("Windows build " + Environment.OSVersion.Version.Build + ": the app uses the "
+                    + ModeName(defaultWpfLayered) + " overlay window here");
+        await CheckOverlayAsync("4 overlay");
+
+        // The technique the app does NOT use on this Windows version, for the record.
+        Report.Experiment = true;
+        OverlayWindow.TestUseWpfLayeredWindow = !defaultWpfLayered;
+        try
+        {
+            await CheckOverlayAsync("4x overlay (" + ModeName(!defaultWpfLayered) + ", not used on this Windows)");
+        }
+        finally
+        {
+            OverlayWindow.TestUseWpfLayeredWindow = null;
+            Report.Experiment = false;
+        }
+    }
+
+    private static string ModeName(bool wpfLayered)
+    {
+        return wpfLayered ? "WPF-layered (AllowsTransparency)" : "DWM-transparent";
+    }
+
+    private async Task CheckOverlayAsync(string name)
+    {
+        string Name = name;
         TextWindow text = _text!;
 
         // Blank white window underneath, so every changed pixel belongs to the overlay.

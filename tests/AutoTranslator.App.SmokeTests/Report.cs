@@ -41,14 +41,32 @@ internal static class Report
         Write("  " + message);
     }
 
+    /// <summary>
+    /// While set, results are printed as "[EXPERIMENT pass/fail]" and not counted: used to try
+    /// a configuration the app does not use on this Windows version.
+    /// </summary>
+    public static bool Experiment { get; set; }
+
     public static void Pass(string name, string details)
     {
+        if (Experiment)
+        {
+            Result("[EXPERIMENT pass]", name, details);
+            return;
+        }
+
         Result("[PASS]", name, details);
         Passed++;
     }
 
     public static void Fail(string name, string details)
     {
+        if (Experiment)
+        {
+            Result("[EXPERIMENT fail]", name, details);
+            return;
+        }
+
         Result("[FAIL]", name, details);
         Failed++;
     }

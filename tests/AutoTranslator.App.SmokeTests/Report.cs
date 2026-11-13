@@ -105,6 +105,17 @@ internal static class Report
         }
 
         Write(string.Empty);
+        lock (Gate)
+        {
+            foreach (string line in Results)
+            {
+                if (line.StartsWith("[FAIL]", StringComparison.Ordinal))
+                {
+                    Write("FAILED: " + line.Substring(7));
+                }
+            }
+        }
+
         Write("TOTAL: " + Passed + " passed, " + Failed + " failed, " + Skipped + " skipped");
     }
 

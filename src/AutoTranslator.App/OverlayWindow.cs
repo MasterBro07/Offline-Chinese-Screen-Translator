@@ -173,6 +173,11 @@ internal sealed class OverlayWindow : Window, IOverlayPresenter
                 hwndSource.CompositionTarget.BackgroundColor = Colors.Transparent;
             }
 
+            if (hwndSource != null)
+            {
+                hwndSource.AddHook(KeepClickThroughStyles);
+            }
+
             var margins = new NativeMethods.MARGINS { Left = -1, Right = -1, Top = -1, Bottom = -1 };
             int hr = NativeMethods.DwmExtendFrameIntoClientArea(_hwnd, ref margins);
             if (hr != 0)
@@ -204,6 +209,28 @@ internal sealed class OverlayWindow : Window, IOverlayPresenter
         }
 
         ApplyBounds();
+    }
+
+    /// <summary>
+    /// WPF removes WS_EX_LAYERED from windows it does not consider transparent whenever it updates
+    /// the window (e.g. on Show). Without that style WS_EX_TRANSPARENT no longer lets clicks through.
+    /// </summary>
+    private IntPtr KeepClickThroughStyles(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == NativeMethods.WM_STYLECHANGING
+            && unchecked((int)wParam.ToInt64()) == NativeMethods.GWL_EXSTYLE
+            && lParam != IntPtr.Zero)
+        {
+            // STYLESTRUCT { DWORD styleOld; DWORD styleNew; }
+            int requested = System.Runtime.InteropServices.Marshal.ReadInt32(lParam, 4);
+            int kept = requested | unchecked((int)(NativeMethods.WS_EX_LAYERED | NativeMethods.WS_EX_TRANSPARENT));
+            if (kept != requested)
+            {
+                System.Runtime.InteropServices.Marshal.WriteInt32(lParam, 4, kept);
+            }
+        }
+
+        return IntPtr.Zero;
     }
 
     protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)

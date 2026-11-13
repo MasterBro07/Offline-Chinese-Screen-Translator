@@ -21,6 +21,7 @@ internal sealed partial class Suite
         // The technique the app does NOT use on this Windows version, for the record.
         Report.Experiment = true;
         OverlayWindow.TestUseWpfLayeredWindow = !defaultWpfLayered;
+        string logBefore = System.IO.File.Exists(Log.FilePath) ? System.IO.File.ReadAllText(Log.FilePath) : string.Empty;
         try
         {
             await CheckOverlayAsync("4x overlay (" + ModeName(!defaultWpfLayered) + ", not used on this Windows)");
@@ -29,6 +30,16 @@ internal sealed partial class Suite
         {
             OverlayWindow.TestUseWpfLayeredWindow = null;
             Report.Experiment = false;
+
+            // Errors the app logs during the experiment are not errors of the real configuration.
+            try
+            {
+                System.IO.File.WriteAllText(Log.FilePath, logBefore);
+            }
+            catch (Exception ex)
+            {
+                Report.Info("restoring the app log after the experiment failed: " + ex.Message);
+            }
         }
     }
 
@@ -100,6 +111,11 @@ internal sealed partial class Suite
                 "visible=" + Native.IsWindowVisible(hwnd) + ", window rect (" + windowRect.Left + "," + windowRect.Top + " "
                 + (windowRect.Right - windowRect.Left) + "x" + (windowRect.Bottom - windowRect.Top) + "), virtual screen "
                 + Shots.Describe(virtualScreen));
+
+            long shownStyle = Native.GetExStyle(hwnd);
+            Report.Check((shownStyle & wanted) == wanted, Name + ": click-through window styles still set while shown",
+                "extended style 0x" + shownStyle.ToString("X") + ": WS_EX_TRANSPARENT=" + ((shownStyle & Native.WS_EX_TRANSPARENT) != 0)
+                + " WS_EX_LAYERED=" + ((shownStyle & Native.WS_EX_LAYERED) != 0));
 
             Report.Check(Native.GetForegroundWindow() == layout.Hwnd, Name + ": does not take the foreground",
                 "foreground after showing the overlay: " + Native.Describe(Native.GetForegroundWindow()));

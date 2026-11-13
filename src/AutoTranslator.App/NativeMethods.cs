@@ -129,6 +129,7 @@ internal static class NativeMethods
     }
 
     public const uint LWA_ALPHA = 0x00000002;
+    public const int WM_STYLECHANGING = 0x007C;
 
     [DllImport("dwmapi.dll")]
     public static extern int DwmExtendFrameIntoClientArea(IntPtr hWnd, ref MARGINS margins);

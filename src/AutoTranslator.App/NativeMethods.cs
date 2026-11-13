@@ -130,6 +130,24 @@ internal static class NativeMethods
 
     public const uint LWA_ALPHA = 0x00000002;
     public const int WM_STYLECHANGING = 0x007C;
+    public const int GWLP_WNDPROC = -4;
+
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    public delegate IntPtr WindowProc(IntPtr hWnd, uint message, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll", EntryPoint = "CallWindowProcW")]
+    public static extern IntPtr CallWindowProc(IntPtr previousProc, IntPtr hWnd, uint message, IntPtr wParam, IntPtr lParam);
+
+    /// <summary>Replaces the window procedure and returns the previous one.</summary>
+    public static IntPtr SetWindowProc(IntPtr hWnd, IntPtr newProc)
+    {
+        if (IntPtr.Size == 8)
+        {
+            return SetWindowLongPtr64(hWnd, GWLP_WNDPROC, newProc);
+        }
+
+        return new IntPtr(SetWindowLong32(hWnd, GWLP_WNDPROC, newProc.ToInt32()));
+    }
 
     [DllImport("dwmapi.dll")]
     public static extern int DwmExtendFrameIntoClientArea(IntPtr hWnd, ref MARGINS margins);

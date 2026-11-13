@@ -61,6 +61,13 @@ internal static class Native
     public const uint WDA_NONE = 0;
     public const uint WDA_EXCLUDEFROMCAPTURE = 0x11;
 
+    public const uint LWA_COLORKEY = 1;
+    public const uint LWA_ALPHA = 2;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool SetLayeredWindowAttributes(IntPtr hWnd, uint colorKey, byte alpha, uint flags);
+
     public const uint GR_GDIOBJECTS = 0;
     public const uint GR_USEROBJECTS = 1;
 

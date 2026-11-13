@@ -67,6 +67,7 @@ internal sealed partial class Suite : IDisposable
         await RunCheckAsync("3 capture+ocr", CheckCaptureOcrAsync);
         await RunCheckAsync("3b small-text ocr", CheckSmallTextAsync);
         await RunCheckAsync("4 overlay", CheckOverlayAsync);
+        await RunCheckAsync("probe", ProbeLayeredWindowAsync);
         await RunCheckAsync("5 pipeline", CheckPipelineAsync);
         await RunCheckAsync("7 ui-automation", CheckUiAutomationAsync);
         await RunCheckAsync("8 resources", CheckResourcesAsync);

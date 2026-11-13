@@ -40,6 +40,8 @@ internal sealed class OverlayWindow : Window, IOverlayPresenter
     internal static bool? TestUseWpfLayeredWindow;
 
     private readonly bool _wpfLayered;
+    private NativeMethods.WindowProc? _styleGuard; // kept alive: native code calls it
+    private IntPtr _wpfWindowProc;
 
     private IntPtr _hwnd;
     private int _originX;
@@ -97,6 +99,13 @@ internal sealed class OverlayWindow : Window, IOverlayPresenter
         _allowClose = true;
         try
         {
+            if (_wpfWindowProc != IntPtr.Zero && _hwnd != IntPtr.Zero)
+            {
+                // Hand the window back to WPF before it is destroyed.
+                NativeMethods.SetWindowProc(_hwnd, _wpfWindowProc);
+                _wpfWindowProc = IntPtr.Zero;
+            }
+
             Close();
         }
         catch (Exception ex)
@@ -173,10 +182,11 @@ internal sealed class OverlayWindow : Window, IOverlayPresenter
                 hwndSource.CompositionTarget.BackgroundColor = Colors.Transparent;
             }
 
-            if (hwndSource != null)
-            {
-                hwndSource.AddHook(KeepClickThroughStyles);
-            }
+            // Must sit above WPF's own window procedure: WPF strips WS_EX_LAYERED in its
+            // WM_STYLECHANGING handler, and hooks added with HwndSource.AddHook run before that.
+            _styleGuard = KeepClickThroughStyles;
+            _wpfWindowProc = NativeMethods.SetWindowProc(
+                _hwnd, System.Runtime.InteropServices.Marshal.GetFunctionPointerForDelegate(_styleGuard));
 
             var margins = new NativeMethods.MARGINS { Left = -1, Right = -1, Top = -1, Bottom = -1 };
             int hr = NativeMethods.DwmExtendFrameIntoClientArea(_hwnd, ref margins);
@@ -215,22 +225,30 @@ internal sealed class OverlayWindow : Window, IOverlayPresenter
     /// WPF removes WS_EX_LAYERED from windows it does not consider transparent whenever it updates
     /// the window (e.g. on Show). Without that style WS_EX_TRANSPARENT no longer lets clicks through.
     /// </summary>
-    private IntPtr KeepClickThroughStyles(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    private IntPtr KeepClickThroughStyles(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam)
     {
-        if (msg == NativeMethods.WM_STYLECHANGING
-            && unchecked((int)wParam.ToInt64()) == NativeMethods.GWL_EXSTYLE
-            && lParam != IntPtr.Zero)
+        IntPtr result = NativeMethods.CallWindowProc(_wpfWindowProc, hwnd, msg, wParam, lParam);
+        try
         {
-            // STYLESTRUCT { DWORD styleOld; DWORD styleNew; }
-            int requested = System.Runtime.InteropServices.Marshal.ReadInt32(lParam, 4);
-            int kept = requested | unchecked((int)(NativeMethods.WS_EX_LAYERED | NativeMethods.WS_EX_TRANSPARENT));
-            if (kept != requested)
+            if (msg == NativeMethods.WM_STYLECHANGING
+                && unchecked((int)wParam.ToInt64()) == NativeMethods.GWL_EXSTYLE
+                && lParam != IntPtr.Zero)
             {
-                System.Runtime.InteropServices.Marshal.WriteInt32(lParam, 4, kept);
+                // STYLESTRUCT { DWORD styleOld; DWORD styleNew; }
+                int requested = System.Runtime.InteropServices.Marshal.ReadInt32(lParam, 4);
+                int kept = requested | unchecked((int)(NativeMethods.WS_EX_LAYERED | NativeMethods.WS_EX_TRANSPARENT));
+                if (kept != requested)
+                {
+                    System.Runtime.InteropServices.Marshal.WriteInt32(lParam, 4, kept);
+                }
             }
         }
+        catch
+        {
+            // Never let an exception escape into native code.
+        }
 
-        return IntPtr.Zero;
+        return result;
     }
 
     protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)

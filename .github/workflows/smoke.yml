@@ -60,6 +60,10 @@ jobs:
         shell: powershell
         run: |
           if (Test-Path "$env:TEMP\ocr-install.log") { Get-Content "$env:TEMP\ocr-install.log" } else { 'no worker log' }
+          if (Test-Path smoke-out/smoke.log) {
+            '--- failures, experiments and probes of the smoke run'
+            Get-Content smoke-out/smoke.log -Encoding UTF8 | Where-Object { $_ -match '^\d+\.\d (FAILED:|TOTAL:|\[EXPERIMENT fail\])|probe: ' }
+          }
 
   # Chrome extension with a real browser and real network: does Chrome's on-device
   # zh -> en translation (language pack download) actually work?

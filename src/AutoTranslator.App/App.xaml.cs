@@ -169,8 +169,7 @@ public partial class App : Application, ISettingsHost
                 AppTitle, MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
-        _overlay = new OverlayWindow();
-        _overlay.Initialize();
+        _overlay = OverlayWindow.CreateInitialized();
 
         _tray = new TrayController();
         _tray.ToggleRequested += OnToggleRequested;

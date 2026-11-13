@@ -152,6 +152,16 @@ internal static class NativeMethods
     [DllImport("dwmapi.dll")]
     public static extern int DwmExtendFrameIntoClientArea(IntPtr hWnd, ref MARGINS margins);
 
+    // DwmSetWindowAttribute: a cloaked window stays "visible" for Win32 but is not composed.
+    public const int DWMWA_CLOAK = 13;
+
+    [DllImport("dwmapi.dll")]
+    public static extern int DwmSetWindowAttribute(IntPtr hWnd, int attribute, ref int value, int size);
+
+    /// <summary>Blocks until DWM has composed the next frame.</summary>
+    [DllImport("dwmapi.dll")]
+    public static extern int DwmFlush();
+
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool SetLayeredWindowAttributes(IntPtr hWnd, uint colorKey, byte alpha, uint flags);

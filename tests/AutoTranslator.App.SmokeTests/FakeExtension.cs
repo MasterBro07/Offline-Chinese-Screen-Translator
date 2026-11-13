@@ -77,9 +77,14 @@ internal sealed class FakeExtension : IDisposable
         return extension;
     }
 
-    public Task SendHelloAsync()
+    public Task SendHelloAsync(int version = 1)
     {
-        return SendAsync("{\"type\":\"hello\",\"version\":1,\"engine\":\"smoke-test\",\"ready\":true,\"detail\":\"\"}");
+        return SendAsync("{\"type\":\"hello\",\"version\":" + version + ",\"engine\":\"smoke-test\",\"ready\":true,\"detail\":\"\"}");
+    }
+
+    public Task SendJsonAsync(string json)
+    {
+        return SendAsync(json);
     }
 
     public List<BridgeRequest> Requests()

@@ -41,8 +41,57 @@ internal sealed partial class Suite
         await RunExeScenarioAsync(Name + " B (settings: UI Automation)", "{ \"TextSourceMode\": \"UiAutomation\" }", false);
     }
 
+    /// <summary>
+    /// Bridge protocol 2 (docs/ARCHITECTURE.md): a version 2 client is told the app state right
+    /// after its hello; without an API key the app offers no premium engine and refuses
+    /// page-translate. A version 1 client never sees the new messages.
+    /// </summary>
+    private static async Task CheckProtocolVersionAsync(string name, FakeExtension extension, int helloVersion)
+    {
+        Func<string, List<string>> ofType = type => extension.OtherMessages()
+            .Where(m => m.Replace(" ", string.Empty).Contains("\"type\":\"" + type + "\"")).ToList();
+
+        if (helloVersion < 2)
+        {
+            await Task.Delay(1500);
+            List<string> states = ofType("app-state");
+            Report.Check(states.Count == 0, name + ": protocol 1 client gets no app-state message",
+                "messages other than translate/ping within 1.5 s after hello: "
+                + (extension.OtherMessages().Count == 0 ? "none" : string.Join(" ", extension.OtherMessages())));
+            return;
+        }
+
+        Stopwatch wait = Stopwatch.StartNew();
+        while (wait.Elapsed < TimeSpan.FromSeconds(5) && ofType("app-state").Count == 0)
+        {
+            await Task.Delay(50);
+        }
+
+        List<string> appStates = ofType("app-state");
+        string state = appStates.Count > 0 ? appStates[0].Replace(" ", string.Empty) : string.Empty;
+        Report.Check(appStates.Count == 1 && state.Contains("\"premium\":false") && state.Contains("\"engine\":\"chrome\""),
+            name + ": protocol 2 client gets app-state after hello",
+            appStates.Count == 0 ? "no app-state message within 5 s"
+                : appStates.Count + " message(s) " + Report.F(wait.Elapsed.TotalMilliseconds) + " ms after hello: " + string.Join(" ", appStates)
+                  + " (expected premium false, engine chrome: no API key is configured)");
+
+        await extension.SendJsonAsync("{\"type\":\"page-translate\",\"id\":\"p1\",\"source\":\"zh\",\"target\":\"en\",\"texts\":[\"你好\"]}");
+        wait.Restart();
+        while (wait.Elapsed < TimeSpan.FromSeconds(5) && ofType("page-error").Count + ofType("page-result").Count == 0)
+        {
+            await Task.Delay(50);
+        }
+
+        List<string> errors = ofType("page-error");
+        Report.Check(errors.Count == 1 && errors[0].Replace(" ", string.Empty).Contains("\"id\":\"p1\"") && ofType("page-result").Count == 0,
+            name + ": page-translate without premium engine is answered with page-error",
+            errors.Count == 0 ? "no page-error within 5 s; page-result messages: " + ofType("page-result").Count
+                : string.Join(" ", errors));
+    }
+
     private async Task RunExeScenarioAsync(string name, string? settingsJson, bool ocrMode)
     {
+        int helloVersion = settingsJson == null ? 1 : 2;
         Report.Info("--- " + name);
         TextWindow text = _text!;
         KillStrayApps();
@@ -133,14 +182,16 @@ internal sealed partial class Suite
             try
             {
                 extension = await FakeExtension.ConnectAsync(BridgePort, GoodOrigin);
-                await extension.SendHelloAsync();
-                Report.Pass(name + ": bridge accepts " + GoodOrigin, "WebSocket open, hello sent");
+                await extension.SendHelloAsync(helloVersion);
+                Report.Pass(name + ": bridge accepts " + GoodOrigin, "WebSocket open, hello (protocol version " + helloVersion + ") sent");
             }
             catch (Exception ex)
             {
                 Report.Fail(name + ": bridge accepts " + GoodOrigin, ex.GetType().Name + ": " + ex.Message);
                 return;
             }
+
+            await CheckProtocolVersionAsync(name, extension, helloVersion);
 
             // The user switches (back) to the program with the Chinese text.
             if (!await EnsureForegroundAsync(name))

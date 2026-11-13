@@ -116,9 +116,17 @@ internal static class ScreenCapture
         return new ScreenRect(left, top, right - left, bottom - top);
     }
 
+    /// <summary>
+    /// Set by an overlay that Windows could not exclude from screen capture: it is asked to
+    /// take itself off the screen for the duration of every capture. Null in the normal case.
+    /// </summary>
+    internal static volatile ICaptureShield? Shield;
+
     /// <summary>Captures the given screen rectangle. The caller owns (and must dispose) the bitmap.</summary>
     public static Bitmap Capture(ScreenRect rect)
     {
+        ICaptureShield? shield = Shield;
+        bool hidden = shield != null && shield.HideForCapture();
         var bitmap = new Bitmap(rect.Width, rect.Height, PixelFormat.Format32bppRgb);
         try
         {
@@ -133,6 +141,13 @@ internal static class ScreenCapture
         {
             bitmap.Dispose();
             throw;
+        }
+        finally
+        {
+            if (hidden)
+            {
+                shield!.RestoreAfterCapture();
+            }
         }
     }
 
@@ -229,4 +244,14 @@ internal static class ScreenCapture
 
         return hash;
     }
+}
+
+/// <summary>Something on screen that must not end up in the app's own screen captures.</summary>
+internal interface ICaptureShield
+{
+    /// <summary>Takes it off the screen; false when there was nothing to hide. Any thread.</summary>
+    bool HideForCapture();
+
+    /// <summary>Puts it back. Only called after <see cref="HideForCapture"/> returned true.</summary>
+    void RestoreAfterCapture();
 }

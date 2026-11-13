@@ -17,7 +17,7 @@ jobs:
       matrix:
         os: [windows-latest, windows-2022]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -39,9 +39,11 @@ jobs:
       - name: Build smoke tests
         run: dotnet build tests/AutoTranslator.App.SmokeTests -c Release -o smoke-bin
 
+      # On Windows Server 2025 the first attempt regularly fails after ~4 min (0x8024001e) and
+      # the second one needs another ~6 min, so the wait is generous.
       - name: Wait for the Chinese OCR recognizer
         shell: powershell
-        run: ./tests/smoke/Install-ChineseOcr.ps1 -Wait -TimeoutSeconds 600
+        run: ./tests/smoke/Install-ChineseOcr.ps1 -Wait -TimeoutSeconds 1080
 
       - name: Run smoke tests
         timeout-minutes: 12

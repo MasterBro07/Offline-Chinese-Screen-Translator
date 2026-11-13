@@ -16,7 +16,7 @@ namespace AutoTranslator.Desktop;
 /// Transparent, click-through, always-on-top window that covers the whole virtual screen and
 /// draws the translations exactly over the original text.
 /// </summary>
-internal sealed class OverlayWindow : Window, IOverlayPresenter
+internal sealed class OverlayWindow : Window, IOverlayPresenter, ICaptureShield
 {
     private const double MinFontSize = 9.0;
     private const double MaxFontSize = 72.0;
@@ -39,9 +39,18 @@ internal sealed class OverlayWindow : Window, IOverlayPresenter
     /// <summary>Smoke-test seam: force one of the two transparency techniques. Never set in production.</summary>
     internal static bool? TestUseWpfLayeredWindow;
 
+    /// <summary>
+    /// Smoke-test seam: behave as if Windows refused to exclude the window from capture (as
+    /// Windows 10 before version 2004 does). Never set in production.
+    /// </summary>
+    internal static bool TestCaptureExclusionUnavailable;
+
     private readonly bool _wpfLayered;
     private NativeMethods.WindowProc? _styleGuard; // kept alive: native code calls it
     private IntPtr _wpfWindowProc;
+
+    private int _exclusionError;
+    private int _cloaked;
 
     private IntPtr _hwnd;
     private int _originX;
@@ -54,12 +63,56 @@ internal sealed class OverlayWindow : Window, IOverlayPresenter
     private int _renderScheduled;
     private bool _allowClose;
 
+    /// <summary>
+    /// Creates the overlay for this Windows version, native window included. When Windows cannot
+    /// exclude the preferred kind of window from screen capture, the other kind is tried; when
+    /// that fails too, the overlay takes itself off the screen during every capture instead
+    /// (<see cref="ICaptureShield"/>), so that the app never reads its own translations.
+    /// </summary>
+    public static OverlayWindow CreateInitialized()
+    {
+        var overlay = new OverlayWindow();
+        overlay.Initialize();
+        if (!overlay.IsExcludedFromCapture && overlay.UsesWpfLayeredWindow)
+        {
+            Log.Info("Capture exclusion failed for the WPF-layered overlay (error " + overlay._exclusionError
+                     + "); trying the DWM-transparent window.");
+            overlay.Shutdown();
+            overlay = new OverlayWindow(false);
+            overlay.Initialize();
+        }
+
+        if (!overlay.IsExcludedFromCapture)
+        {
+            Log.Info("Windows cannot exclude the overlay from screen capture (error " + overlay._exclusionError
+                     + "). The overlay is hidden for a moment during every capture instead; it may flicker slightly.");
+            ScreenCapture.Shield = overlay;
+        }
+
+        return overlay;
+    }
+
+    /// <summary>True when Windows keeps this window out of screen captures (the normal case).</summary>
+    internal bool IsExcludedFromCapture { get; private set; }
+
+    /// <summary>True for a WPF "AllowsTransparency" window, false for the DWM-transparent one.</summary>
+    internal bool UsesWpfLayeredWindow
+    {
+        get { return _wpfLayered; }
+    }
+
     public OverlayWindow()
+        : this(null)
+    {
+    }
+
+    /// <param name="wpfLayered">Transparency technique; null picks the one for this Windows version.</param>
+    internal OverlayWindow(bool? wpfLayered)
     {
         Title = "AutoTranslator Overlay";
         WindowStyle = WindowStyle.None;
         ResizeMode = ResizeMode.NoResize;
-        _wpfLayered = TestUseWpfLayeredWindow ?? Environment.OSVersion.Version.Build >= FirstWindows11Build;
+        _wpfLayered = wpfLayered ?? TestUseWpfLayeredWindow ?? Environment.OSVersion.Version.Build >= FirstWindows11Build;
         AllowsTransparency = _wpfLayered;
         Background = Brushes.Transparent;
         Topmost = true;
@@ -97,6 +150,11 @@ internal sealed class OverlayWindow : Window, IOverlayPresenter
     {
         SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         _allowClose = true;
+        if (ReferenceEquals(ScreenCapture.Shield, this))
+        {
+            ScreenCapture.Shield = null;
+        }
+
         try
         {
             if (_wpfWindowProc != IntPtr.Zero && _hwnd != IntPtr.Zero)
@@ -211,11 +269,18 @@ internal sealed class OverlayWindow : Window, IOverlayPresenter
 
         // Essential: hide the overlay from screen capture, otherwise OCR would read (and cover)
         // our own translations instead of the original text.
-        if (!NativeMethods.SetWindowDisplayAffinity(_hwnd, NativeMethods.WDA_EXCLUDEFROMCAPTURE))
+        if (TestCaptureExclusionUnavailable)
         {
-            Log.Error("SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE) failed, error "
-                      + System.Runtime.InteropServices.Marshal.GetLastWin32Error()
-                      + ". The overlay is visible to screen capture; OCR will read the translations.");
+            _exclusionError = -1;
+        }
+        else if (NativeMethods.SetWindowDisplayAffinity(_hwnd, NativeMethods.WDA_EXCLUDEFROMCAPTURE))
+        {
+            IsExcludedFromCapture = true;
+        }
+        else
+        {
+            // Not an error by itself: CreateInitialized falls back (other window kind, capture shield).
+            _exclusionError = System.Runtime.InteropServices.Marshal.GetLastWin32Error();
         }
 
         ApplyBounds();
@@ -249,6 +314,40 @@ internal sealed class OverlayWindow : Window, IOverlayPresenter
         }
 
         return result;
+    }
+
+    // ---- ICaptureShield (called from the capture thread; only used without capture exclusion) ----
+
+    bool ICaptureShield.HideForCapture()
+    {
+        IntPtr hwnd = _hwnd;
+        if (hwnd == IntPtr.Zero || _allowClose || !NativeMethods.IsWindowVisible(hwnd))
+        {
+            return false;
+        }
+
+        int cloak = 1;
+        if (NativeMethods.DwmSetWindowAttribute(hwnd, NativeMethods.DWMWA_CLOAK, ref cloak, sizeof(int)) != 0)
+        {
+            return false;
+        }
+
+        Interlocked.Exchange(ref _cloaked, 1);
+
+        // The screen is only free of the overlay once DWM has composed a frame without it.
+        NativeMethods.DwmFlush();
+        NativeMethods.DwmFlush();
+        return true;
+    }
+
+    void ICaptureShield.RestoreAfterCapture()
+    {
+        IntPtr hwnd = _hwnd;
+        if (hwnd != IntPtr.Zero && Interlocked.Exchange(ref _cloaked, 0) == 1)
+        {
+            int cloak = 0;
+            NativeMethods.DwmSetWindowAttribute(hwnd, NativeMethods.DWMWA_CLOAK, ref cloak, sizeof(int));
+        }
     }
 
     protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)

@@ -1,0 +1,76 @@
+name: Extension
+
+# Chrome extension tests on Windows, macOS and Linux, including one attempt at a real on-device
+# translation (Chrome downloads the zh → en language pack). Started by hand: Actions → Extension → Run workflow.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  extension:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Playwright
+        shell: pwsh
+        run: |
+          npm i playwright ws
+          npx playwright install chromium
+
+      - name: Extension tests with real translation (Chromium)
+        id: chromium
+        shell: pwsh
+        continue-on-error: true
+        timeout-minutes: 8
+        run: |
+          node extension-tests/run.js --real 2>&1 | Tee-Object -FilePath extension-chromium.log
+          $code = $LASTEXITCODE
+          $line = Select-String -Path extension-chromium.log -Pattern 'REAL_TRANSLATION: (\w+)' | Select-Object -Last 1
+          $result = if ($line) { $line.Matches[0].Groups[1].Value } else { 'MISSING' }
+          "result=$result" >> $env:GITHUB_OUTPUT
+          exit $code
+
+      # Plain Chromium may not be able to download the language pack; branded Chrome is preinstalled.
+      - name: Extension tests with real translation (branded Chrome, one retry)
+        id: chrome
+        if: ${{ !cancelled() && steps.chromium.outputs.result != 'OK' }}
+        shell: pwsh
+        continue-on-error: true
+        timeout-minutes: 8
+        run: |
+          node extension-tests/run.js --real --channel=chrome 2>&1 | Tee-Object -FilePath extension-chrome.log
+          exit $LASTEXITCODE
+
+      - name: Summary
+        if: always()
+        shell: pwsh
+        run: |
+          foreach ($f in Get-ChildItem extension-*.log -ErrorAction SilentlyContinue) {
+            $pass = (Select-String -Path $f -Pattern '^PASS ').Count
+            $fail = (Select-String -Path $f -Pattern '^FAIL ').Count
+            $real = Select-String -Path $f -Pattern 'REAL_TRANSLATION: \w+' | Select-Object -Last 1
+            "$($f.Name): $pass passed, $fail failed, $($real.Line)" | Tee-Object -Append -FilePath $env:GITHUB_STEP_SUMMARY
+          }
+          if ("${{ steps.chromium.outcome }}" -ne 'success' -and "${{ steps.chrome.outcome }}" -ne 'success') { exit 1 }
+
+      - name: Upload extension test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-results-${{ matrix.os }}
+          path: extension-*.log
+          if-no-files-found: warn

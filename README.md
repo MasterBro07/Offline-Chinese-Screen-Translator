@@ -3,7 +3,8 @@
 *The app inside is called **AutoTranslator**.*
 
 [![Build](https://github.com/MasterBro07/Offline-Chinese-Screen-Translator/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/MasterBro07/Offline-Chinese-Screen-Translator/actions/workflows/build.yml?query=branch%3Amain)
-![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6)
+![Extension](https://img.shields.io/badge/extension-Windows%20%7C%20macOS%20%7C%20Linux-0078D6)
+![App](https://img.shields.io/badge/app-Windows%2010%20%7C%2011-0078D6)
 ![Offline](https://img.shields.io/badge/translation-100%25%20offline-1a7f37)
 ![Price](https://img.shields.io/badge/price-free-1a7f37)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
@@ -92,9 +93,17 @@ already translated pages.
 
 ## Requirements
 
-- Windows 10 (version 2004 or newer) or Windows 11, 64-bit
-- Google Chrome 138 or newer on the same PC
-- About 10 minutes for the one-time setup
+| Part | Works on |
+|---|---|
+| **Chrome extension** (websites) | **Windows, macOS and Linux**: Google Chrome 138 or newer on a desktop computer |
+| **Desktop app** (other programs) | Windows 10 (version 2004 or newer) or Windows 11, 64-bit |
+
+- About 10 minutes for the one-time setup (2 minutes if you only need the extension)
+- Not available on phones: Chrome on Android and iPhone has no extensions and no on-device translator.
+
+**On a Mac or Linux PC** you only need the extension: do steps 1 and 2 of the tutorial below
+(download only `AutoTranslator-chrome-extension.zip`). Everything else works exactly as on Windows,
+including the offline translation.
 
 ## Installation tutorial
 

@@ -47,8 +47,16 @@ keine zweite Einblendung legt.
 
 ## Voraussetzungen
 
-- Windows 10 (Version 2004 oder neuer) oder Windows 11, 64 Bit
-- Google Chrome in aktueller Version (auf dem Desktop-PC)
+| Teil | Läuft auf |
+|---|---|
+| **Chrome-Erweiterung** (Webseiten) | **Windows, macOS und Linux**: Google Chrome 138 oder neuer auf einem Desktop-Computer |
+| **Windows-Programm** (andere Programme) | Windows 10 (Version 2004 oder neuer) oder Windows 11, 64 Bit |
+
+- Nicht auf dem Handy: Chrome für Android und iPhone kann keine Erweiterungen und hat keinen Offline-Übersetzer.
+
+**Auf einem Mac oder Linux-PC** braucht man nur die Erweiterung: die Schritte 1 und 2 der Anleitung
+(nur `AutoTranslator-chrome-extension.zip` herunterladen). Alles andere funktioniert genau wie unter Windows,
+auch die Offline-Übersetzung.
 
 ## 1. Herunterladen
 

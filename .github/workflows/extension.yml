@@ -1,7 +1,7 @@
 name: Extension
 
 # Chrome extension tests on Windows, macOS and Linux, including one attempt at a real on-device
-# translation (Chrome downloads the zh → en language pack). Started by hand: Actions → Extension → Run workflow.
+# translation (the language pack download usually stalls on CI runners; it works on real PCs). Started by hand: Actions → Extension → Run workflow.
 on:
   workflow_dispatch:
 
@@ -44,17 +44,6 @@ jobs:
           "result=$result" >> $env:GITHUB_OUTPUT
           exit $code
 
-      # Plain Chromium may not be able to download the language pack; branded Chrome is preinstalled.
-      - name: Extension tests with real translation (branded Chrome, one retry)
-        id: chrome
-        if: ${{ !cancelled() && steps.chromium.outputs.result != 'OK' }}
-        shell: pwsh
-        continue-on-error: true
-        timeout-minutes: 8
-        run: |
-          node extension-tests/run.js --real --channel=chrome 2>&1 | Tee-Object -FilePath extension-chrome.log
-          exit $LASTEXITCODE
-
       - name: Summary
         if: always()
         shell: pwsh
@@ -65,7 +54,7 @@ jobs:
             $real = Select-String -Path $f -Pattern 'REAL_TRANSLATION: \w+' | Select-Object -Last 1
             "$($f.Name): $pass passed, $fail failed, $($real.Line)" | Tee-Object -Append -FilePath $env:GITHUB_STEP_SUMMARY
           }
-          if ("${{ steps.chromium.outcome }}" -ne 'success' -and "${{ steps.chrome.outcome }}" -ne 'success') { exit 1 }
+          if ("${{ steps.chromium.outcome }}" -ne 'success') { exit 1 }
 
       - name: Upload extension test logs
         if: always()

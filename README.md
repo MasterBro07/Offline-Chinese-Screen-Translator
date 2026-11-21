@@ -4,7 +4,7 @@
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6)
 ![Offline](https://img.shields.io/badge/translation-100%25%20offline-1a7f37)
 ![Price](https://img.shields.io/badge/price-free-1a7f37)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![License: PolyForm Strict](https://img.shields.io/badge/license-PolyForm%20Strict%201.0.0-blue)](LICENSE)
 
 **AutoTranslator translates Chinese text on your screen into English, automatically and without a single click.**
 It works in Chrome and in ordinary Windows programs (shop apps, chat apps, games, installers) by drawing the
@@ -61,7 +61,7 @@ click **"Sprachpaket laden"**. After that you can unplug the network cable and t
   layer over the original. Clicks go straight through to the program underneath.
 - **Fast:** in tests, new text was translated and shown about 0.5 s after it appeared.
 - **Light:** a small tray icon next to the clock; when the screen does not change, it does almost nothing.
-- **Free** and open source.
+- **Free** for personal use, with public source code.
 
 > The user interface of the app and the extension is in German. Translation direction is Chinese → English.
 
@@ -193,4 +193,12 @@ The local connection only accepts Chrome extensions (`chrome-extension://` origi
 
 ## License
 
-[MIT](LICENSE): free to use, change and share, also commercially, as long as the copyright notice stays in.
+[PolyForm Strict 1.0.0](LICENSE). In short:
+
+- **Allowed:** free use for **personal and other noncommercial purposes** (private use, study, hobby,
+  charities, schools, public institutions).
+- **Not allowed:** commercial use, **redistributing** the software (please link to this repository
+  instead of re-uploading it), and publishing changed versions or new works based on it.
+
+The source code is public so you can see what the program does, but this is not an open-source license.
+For commercial use or any other permission, please ask the author.

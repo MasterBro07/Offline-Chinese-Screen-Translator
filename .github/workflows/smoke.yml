@@ -2,8 +2,8 @@ name: Smoke
 
 # Runs the desktop app for real on a Windows runner: capture, OCR, overlay, bridge, shipped exe.
 # The checks print [PASS] / [FAIL] / [SKIP] lines; logs and screenshots are uploaded as artifacts.
+# Started by hand only (Actions → Smoke → Run workflow); a full run takes about 20 minutes.
 on:
-  push:
   workflow_dispatch:
 
 permissions:

@@ -4,6 +4,7 @@
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6)
 ![Offline](https://img.shields.io/badge/translation-100%25%20offline-1a7f37)
 ![Price](https://img.shields.io/badge/price-free-1a7f37)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 **AutoTranslator translates Chinese text on your screen into English, automatically and without a single click.**
 It works in Chrome and in ordinary Windows programs (shop apps, chat apps, games, installers) by drawing the
@@ -189,3 +190,7 @@ The local connection only accepts Chrome extensions (`chrome-extension://` origi
 - Core tests run on any OS: `dotnet test tests/AutoTranslator.Core.Tests`
 - Extension tests: `npm i playwright ws && node extension-tests/run.js`
 - Architecture and the bridge protocol: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+
+## License
+
+[MIT](LICENSE): free to use, change and share, also commercially, as long as the copyright notice stays in.

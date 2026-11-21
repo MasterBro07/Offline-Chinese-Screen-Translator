@@ -100,3 +100,7 @@ Add-WindowsCapability -Online -Name "Language.OCR~~~zh-CN~0.0.1.0"
 
 Ein Ablaufdiagramm steht in [docs/workflow.svg](docs/workflow.svg). Aufbau und Schnittstellen sind in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) beschrieben (englisch).
 Das Windows-Programm wird von GitHub Actions gebaut (`.github/workflows/build.yml`).
+
+## Lizenz
+
+[MIT](LICENSE): frei nutzbar, veränderbar und weitergebbar, auch kommerziell, solange der Lizenzhinweis erhalten bleibt.

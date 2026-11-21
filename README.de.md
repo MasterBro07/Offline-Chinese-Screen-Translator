@@ -103,12 +103,4 @@ Das Windows-Programm wird von GitHub Actions gebaut (`.github/workflows/build.ym
 
 ## Lizenz
 
-[PolyForm Strict 1.0.0](LICENSE). Kurz gesagt:
-
-- **Erlaubt:** kostenlose Nutzung für **private und andere nicht kommerzielle Zwecke** (privat, Lernen, Hobby,
-  gemeinnützige Vereine, Schulen, öffentliche Einrichtungen).
-- **Nicht erlaubt:** kommerzielle Nutzung, das Programm **weiterzugeben oder erneut hochzuladen** (bitte stattdessen
-  auf dieses Repository verlinken) sowie veränderte Versionen oder darauf aufbauende Werke zu veröffentlichen.
-
-Der Quellcode ist öffentlich einsehbar, damit man sieht, was das Programm tut; es ist aber keine Open-Source-Lizenz.
-Für kommerzielle Nutzung oder andere Erlaubnisse bitte beim Autor nachfragen.
+[MIT](LICENSE): frei nutzbar, veränderbar und weitergebbar, auch kommerziell, solange der Lizenzhinweis erhalten bleibt.

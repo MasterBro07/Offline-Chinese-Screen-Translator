@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title>How AutoTranslator works: everything runs offline on your PC</title>
+  <defs>
+    <marker id="blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#0969da"/>
+    </marker>
+    <marker id="purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#8250df"/>
+    </marker>
+    <marker id="gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#6e7781"/>
+    </marker>
+  </defs>
+
+  <!-- card -->
+  <rect x="0.5" y="0.5" width="1199" height="699" rx="16" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="40" y="50" font-size="24" font-weight="700" fill="#1f2328">How AutoTranslator works</text>
+  <text x="40" y="76" font-size="15" fill="#57606a">Chinese text on screen in, English overlay out, in about half a second</text>
+
+  <!-- offline boundary -->
+  <rect x="24" y="96" width="1152" height="470" rx="14" fill="#f0fdf4" stroke="#1a7f37" stroke-width="2" stroke-dasharray="8 6"/>
+  <text x="46" y="124" font-size="13" font-weight="700" fill="#1a7f37" letter-spacing="1.2">YOUR PC · 100 % OFFLINE</text>
+  <text x="1154" y="124" font-size="13" fill="#1a7f37" text-anchor="end">no screen text or page text ever leaves this computer</text>
+
+  <!-- lane A: desktop app -->
+  <text x="48" y="162" font-size="14" font-weight="700" fill="#0969da">Desktop app · AutoTranslator.exe</text>
+
+  <g font-size="12.5" fill="#57606a">
+    <rect x="48" y="176" width="176" height="96" rx="10" fill="#ffffff" stroke="#0969da" stroke-width="1.5"/>
+    <text x="64" y="206" font-size="15" font-weight="700" fill="#1f2328">1  Screen</text>
+    <text x="64" y="230">Any Windows program</text>
+    <text x="64" y="248">or game with Chinese text</text>
+
+    <rect x="272" y="176" width="176" height="96" rx="10" fill="#ffffff" stroke="#0969da" stroke-width="1.5"/>
+    <text x="288" y="206" font-size="15" font-weight="700" fill="#1f2328">2  Capture</text>
+    <text x="288" y="230">Active window, 0.7 s loop;</text>
+    <text x="288" y="248">skips unchanged frames</text>
+
+    <rect x="496" y="176" width="176" height="96" rx="10" fill="#ffffff" stroke="#0969da" stroke-width="1.5"/>
+    <text x="512" y="206" font-size="15" font-weight="700" fill="#1f2328">3  Windows OCR</text>
+    <text x="512" y="230">Built-in Chinese text</text>
+    <text x="512" y="248">recognition with positions</text>
+
+    <rect x="720" y="176" width="176" height="96" rx="10" fill="#ffffff" stroke="#0969da" stroke-width="1.5"/>
+    <text x="736" y="206" font-size="15" font-weight="700" fill="#1f2328">4  Filter &amp; cache</text>
+    <text x="736" y="230">Keep Chinese lines, join</text>
+    <text x="736" y="248">paragraphs, reuse results</text>
+
+    <rect x="944" y="176" width="176" height="96" rx="10" fill="#ffffff" stroke="#0969da" stroke-width="1.5"/>
+    <text x="960" y="206" font-size="15" font-weight="700" fill="#1f2328">6  Overlay</text>
+    <text x="960" y="230">English drawn on top,</text>
+    <text x="960" y="248">click-through</text>
+  </g>
+
+  <g stroke="#0969da" stroke-width="2" fill="none">
+    <path d="M224 224 H268" marker-end="url(#blue)"/>
+    <path d="M448 224 H492" marker-end="url(#blue)"/>
+    <path d="M672 224 H716" marker-end="url(#blue)"/>
+  </g>
+
+  <!-- lane B: Chrome extension -->
+  <text x="48" y="330" font-size="14" font-weight="700" fill="#8250df">Chrome · Auto Translator extension</text>
+
+  <g font-size="12.5" fill="#57606a">
+    <rect x="48" y="346" width="176" height="96" rx="10" fill="#ffffff" stroke="#8250df" stroke-width="1.5"/>
+    <text x="64" y="376" font-size="15" font-weight="700" fill="#1f2328">Web page</text>
+    <text x="64" y="400">Shops, news, chats,</text>
+    <text x="64" y="418">iframes and pop-ups</text>
+
+    <rect x="272" y="346" width="176" height="96" rx="10" fill="#ffffff" stroke="#8250df" stroke-width="1.5"/>
+    <text x="288" y="376" font-size="15" font-weight="700" fill="#1f2328">Read &amp; replace</text>
+    <text x="288" y="400">Finds Chinese text,</text>
+    <text x="288" y="418">swaps in English live</text>
+
+    <rect x="720" y="346" width="176" height="96" rx="10" fill="#ffffff" stroke="#8250df" stroke-width="2.5"/>
+    <text x="736" y="376" font-size="15" font-weight="700" fill="#1f2328">5  Translate</text>
+    <text x="736" y="400">Chrome's built-in</text>
+    <text x="736" y="418">on-device translator</text>
+
+    <rect x="720" y="470" width="176" height="64" rx="10" fill="#ffffff" stroke="#8250df" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <text x="736" y="496" font-size="13.5" font-weight="700" fill="#1f2328">zh → en language pack</text>
+    <text x="736" y="516">stored by Chrome on disk</text>
+  </g>
+
+  <g stroke="#8250df" stroke-width="2" fill="none">
+    <path d="M224 394 H268" marker-end="url(#purple)"/>
+    <path d="M452 394 H716" marker-start="url(#purple)" marker-end="url(#purple)"/>
+    <path d="M808 442 V466" stroke-dasharray="4 3"/>
+  </g>
+  <text x="584" y="386" font-size="12.5" fill="#8250df" text-anchor="middle">Chinese text  ⇄  English</text>
+
+  <!-- app <-> extension over localhost -->
+  <g stroke="#0969da" stroke-width="2" fill="none">
+    <path d="M808 272 V342" marker-end="url(#blue)"/>
+    <path d="M896 394 H1032 V276" marker-end="url(#blue)"/>
+  </g>
+  <rect x="596" y="294" width="200" height="26" rx="13" fill="#ddf4ff" stroke="#0969da"/>
+  <text x="696" y="312" font-size="12.5" fill="#0969da" text-anchor="middle">localhost 127.0.0.1:47613</text>
+  <text x="1042" y="336" font-size="12.5" fill="#0969da">English text</text>
+
+  <!-- outside: internet, used once -->
+  <path d="M808 534 V586" stroke="#6e7781" stroke-width="2" stroke-dasharray="5 4" fill="none" marker-end="url(#gray)"/>
+  <text x="796" y="560" font-size="12.5" fill="#6e7781" text-anchor="end">one-time download</text>
+  <rect x="608" y="590" width="400" height="84" rx="12" fill="#f6f8fa" stroke="#8c959f" stroke-dasharray="6 5"/>
+  <text x="628" y="616" font-size="14" font-weight="700" fill="#57606a">Internet</text>
+  <text x="628" y="638" font-size="12.5" fill="#57606a">Used once: Chrome downloads the language pack.</text>
+  <text x="628" y="658" font-size="12.5" fill="#57606a">Your screen text and page text are never uploaded.</text>
+
+  <text x="40" y="616" font-size="12.5" fill="#57606a">Also local: settings and translation cache in %AppData%</text>
+  <text x="40" y="638" font-size="12.5" fill="#57606a">No account · no API key · no telemetry · free</text>
+</svg>

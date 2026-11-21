@@ -30,6 +30,7 @@ No account, no API key, no subscription, and no screen text is ever uploaded.
 
 - [Why offline matters](#why-offline-matters)
 - [What you get](#what-you-get)
+- [Which part should I use?](#which-part-should-i-use)
 - [Requirements](#requirements)
 - [Installation tutorial](#installation-tutorial)
 - [Everyday use](#everyday-use)
@@ -71,6 +72,22 @@ click **"Sprachpaket laden"**. After that you can unplug the network cable and t
 
 > The user interface of the app and the extension is in German. Translation direction is Chinese → English.
 
+## Which part should I use?
+
+**For websites, use the Chrome extension. It is the better choice for everyday things like online shopping
+or ordering food on Uber Eats.** It reads the real text of the page instead of a screenshot, so it is
+faster and more accurate: the English appears directly in the page, stays in place while you scroll, and
+small print, prices and menus are translated without recognition errors.
+
+| You want to translate … | Use | Why |
+|---|---|---|
+| Websites in Chrome: shops, food delivery, news, social media | **Chrome extension** ⭐ | Instant, exact, translated right inside the page |
+| Programs outside the browser: desktop apps, games, installers | **Desktop app** (`AutoTranslator.exe`) | Reads the screen with OCR and draws English on top |
+
+The extension also works on its own: if you only need websites, steps 1 and 2 of the tutorial are enough.
+Turn the desktop app off (Ctrl + Alt + T) while browsing so it does not add a second overlay on top of
+already translated pages.
+
 ## Requirements
 
 - Windows 10 (version 2004 or newer) or Windows 11, 64-bit
@@ -101,6 +118,9 @@ click **"Sprachpaket laden"**. After that you can unplug the network cable and t
    says **"bereit"** (ready). This is the only time anything is downloaded.
 
 Websites in Chrome are now translated automatically. Tabs that were already open need one reload.
+
+> **Only need websites (shopping, Uber Eats, news …)? You are done here.** Steps 3 and 4 are only for
+> programs outside the browser.
 
 ### Step 3 – Add Chinese text recognition to Windows
 

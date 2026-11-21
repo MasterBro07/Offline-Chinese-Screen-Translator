@@ -25,7 +25,23 @@ bleiben auf dem PC.
 | **Windows-Programm** (`AutoTranslator.exe`) | Läuft als Symbol neben der Uhr, erkennt chinesischen Text auf dem Bildschirm und blendet die Übersetzung ein. |
 | **Chrome-Erweiterung** | Übersetzt Webseiten direkt in Chrome und liefert dem Windows-Programm die Übersetzungen. |
 
-Beide Teile werden gebraucht. Chrome muss geöffnet sein, solange übersetzt werden soll.
+Chrome muss geöffnet sein, solange übersetzt werden soll.
+
+### Welcher Teil wofür?
+
+**Für Webseiten ist die Chrome-Erweiterung die bessere Wahl, gerade für Alltägliches wie Online-Shopping
+oder Essen bestellen bei Uber Eats.** Sie liest den echten Text der Seite statt eines Bildschirmfotos und
+ist dadurch schneller und genauer: Das Englische steht direkt in der Seite, bleibt beim Scrollen an seinem
+Platz, und Kleingedrucktes, Preise und Menüs werden ohne Erkennungsfehler übersetzt.
+
+| Was übersetzt werden soll | Was man nimmt | Warum |
+|---|---|---|
+| Webseiten in Chrome: Shops, Essenslieferung, Nachrichten, soziale Netzwerke | **Chrome-Erweiterung** ⭐ | Sofort, genau, direkt in der Seite übersetzt |
+| Programme außerhalb des Browsers: Desktop-Apps, Spiele, Installationsprogramme | **Windows-Programm** (`AutoTranslator.exe`) | Liest den Bildschirm per Texterkennung und blendet Englisch darüber ein |
+
+Die Erweiterung funktioniert auch allein: Wer nur Webseiten übersetzen will, braucht nur die Schritte 1 und 2.
+Beim Surfen das Windows-Programm am besten ausschalten (Strg+Alt+T), damit es über schon übersetzte Seiten
+keine zweite Einblendung legt.
 
 ## Voraussetzungen
 
@@ -51,6 +67,9 @@ Beide Teile werden gebraucht. Chrome muss geöffnet sein, solange übersetzt wer
    **„Sprachpaket laden“** anklicken. Warten, bis es fertig ist. Das ist nur einmal nötig.
 
 Der Ordner darf danach nicht gelöscht oder verschoben werden.
+
+> **Nur Webseiten übersetzen (Einkaufen, Uber Eats, Nachrichten …)? Dann ist man hier schon fertig.**
+> Die Schritte 3 und 4 braucht man nur für Programme außerhalb des Browsers.
 
 ## 3. Chinesische Texterkennung für Windows installieren
 

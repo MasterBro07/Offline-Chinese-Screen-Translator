@@ -5,6 +5,7 @@
 ![Offline](https://img.shields.io/badge/translation-100%25%20offline-1a7f37)
 ![Price](https://img.shields.io/badge/price-free-1a7f37)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+![Vibe-coded](https://img.shields.io/badge/vibe--coded-with%20Claude%20Code-d97757)
 
 **AutoTranslator translates Chinese text on your screen into English, automatically and without a single click.**
 It works in Chrome and in ordinary Windows programs (shop apps, chat apps, games, installers) by drawing the
@@ -13,6 +14,11 @@ English translation directly on top of the Chinese original.
 **Everything runs on your own computer.** Translation uses the translator built into Google Chrome,
 text recognition uses the one built into Windows, and the two parts talk to each other only inside your PC.
 No account, no API key, no subscription, and no screen text is ever uploaded.
+
+> **🤖 Vibe-coded.** This whole project was built with AI: the author described what they wanted in plain
+> language, and [Claude Code](https://claude.com/claude-code) planned, wrote, tested and documented the code.
+> No line was written by hand. The app was built and tested automatically on Windows (see
+> [Known limits](#known-limits)) and works well for the author, but treat it as a hobby project.
 
 *Deutsche Anleitung: [README.de.md](README.de.md)*
 

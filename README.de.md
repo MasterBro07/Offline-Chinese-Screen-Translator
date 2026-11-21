@@ -11,6 +11,11 @@ komplett auf dem eigenen Computer**: Nach dem einmaligen Herunterladen des Sprac
 Internet geschickt. Auch die Texterkennung (Windows) und die Verbindung zwischen Programm und Erweiterung
 bleiben auf dem PC.
 
+> **🤖 Gevibecoded.** Dieses Projekt ist komplett mit KI entstanden: Der Autor hat in normaler Sprache
+> beschrieben, was er möchte, und [Claude Code](https://claude.com/claude-code) hat den Code geplant,
+> geschrieben, getestet und dokumentiert. Keine Zeile wurde von Hand programmiert. Das Programm wurde
+> automatisch unter Windows gebaut und getestet und läuft beim Autor gut, ist aber ein Hobbyprojekt.
+
 > **Hinweis:** Sie funktioniert in vielen, aber nicht in allen Situationen (siehe „Bekannte Grenzen“).
 
 ## Aus welchen Teilen besteht es?

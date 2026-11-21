@@ -1,0 +1,56 @@
+name: Release
+
+# Start by hand: Actions → Release → "Run workflow". Builds the app and the extension and
+# publishes both as ZIP files on a new GitHub Release (downloadable without a GitHub account).
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version number, e.g. 1.0.0"
+        required: true
+        default: "1.0.0"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Test Core
+        run: dotnet test tests/AutoTranslator.Core.Tests -c Release
+
+      - name: Publish desktop app
+        run: dotnet publish src/AutoTranslator.App -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+
+      - name: Package
+        shell: pwsh
+        run: |
+          Compress-Archive -Path publish/* -DestinationPath AutoTranslator-windows-x64.zip
+          Compress-Archive -Path extension/* -DestinationPath AutoTranslator-chrome-extension.zip
+
+      - name: Create release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          $notes = @"
+          Translates Chinese text on screen into English automatically. 100 % offline.
+
+          **Downloads**
+          - ``AutoTranslator-windows-x64.zip``: the Windows app (unzip, run ``AutoTranslator.exe``)
+          - ``AutoTranslator-chrome-extension.zip``: the Chrome extension (unzip, load it on ``chrome://extensions`` with Developer mode → Load unpacked)
+
+          Step-by-step setup: see the [README](https://github.com/${{ github.repository }}#installation-tutorial).
+          "@
+          gh release create "v$env:VERSION" AutoTranslator-windows-x64.zip AutoTranslator-chrome-extension.zip `
+            --target "${{ github.sha }}" --title "AutoTranslator $env:VERSION" --notes $notes

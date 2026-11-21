@@ -74,12 +74,15 @@ click **"Sprachpaket laden"**. After that you can unplug the network cable and t
 
 ### Step 1 – Download
 
-1. Open the [**Build** workflow runs for `main`](https://github.com/MasterBro07/Automatic-Web-Translator-claude/actions/workflows/build.yml?query=branch%3Amain)
-   and click the newest run with a green check mark. You need to be signed in to GitHub to download.
-2. Scroll down to **Artifacts** and download both files:
-   - `AutoTranslator-windows`: the Windows app
-   - `AutoTranslator-chrome-extension`: the Chrome extension
-3. Unzip both (right-click → **Extract All…**) to a permanent place, for example
+1. Open the [**latest release**](https://github.com/MasterBro07/Automatic-Web-Translator-claude/releases/latest)
+   and download both ZIP files:
+   - `AutoTranslator-windows-x64.zip`: the Windows app
+   - `AutoTranslator-chrome-extension.zip`: the Chrome extension
+
+   *No release yet?* Use the newest green run of the
+   [**Build** workflow](https://github.com/MasterBro07/Automatic-Web-Translator-claude/actions/workflows/build.yml?query=branch%3Amain)
+   instead and download the two **Artifacts** at the bottom (requires a GitHub sign-in).
+2. Unzip both (right-click → **Extract All…**) to a permanent place, for example
    `C:\AutoTranslator\app` and `C:\AutoTranslator\extension`. Do not delete or move these folders later.
 
 ### Step 2 – Install the Chrome extension
@@ -181,6 +184,8 @@ The local connection only accepts Chrome extensions (`chrome-extension://` origi
 
 - Build: GitHub Actions ([`build.yml`](.github/workflows/build.yml)) runs the tests and publishes a
   self-contained `AutoTranslator.exe` plus the extension as artifacts.
+- Release: run the [`Release`](.github/workflows/release.yml) workflow by hand (Actions → Release →
+  *Run workflow*); it builds both parts and publishes them as ZIP files on a new GitHub Release.
 - Core tests run on any OS: `dotnet test tests/AutoTranslator.Core.Tests`
 - Extension tests: `npm i playwright ws && node extension-tests/run.js`
 - Architecture and the bridge protocol: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)

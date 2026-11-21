@@ -1,6 +1,8 @@
-# AutoTranslator
+# Offline Chinese Screen Translator
 
-[![Build](https://github.com/MasterBro07/Automatic-Web-Translator-claude/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/MasterBro07/Automatic-Web-Translator-claude/actions/workflows/build.yml?query=branch%3Amain)
+*The app inside is called **AutoTranslator**.*
+
+[![Build](https://github.com/MasterBro07/Offline-Chinese-Screen-Translator/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/MasterBro07/Offline-Chinese-Screen-Translator/actions/workflows/build.yml?query=branch%3Amain)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6)
 ![Offline](https://img.shields.io/badge/translation-100%25%20offline-1a7f37)
 ![Price](https://img.shields.io/badge/price-free-1a7f37)
@@ -98,13 +100,13 @@ already translated pages.
 
 ### Step 1 – Download
 
-1. Open the [**latest release**](https://github.com/MasterBro07/Automatic-Web-Translator-claude/releases/latest)
+1. Open the [**latest release**](https://github.com/MasterBro07/Offline-Chinese-Screen-Translator/releases/latest)
    and download both ZIP files:
    - `AutoTranslator-windows-x64.zip`: the Windows app
    - `AutoTranslator-chrome-extension.zip`: the Chrome extension
 
    *No release yet?* Use the newest green run of the
-   [**Build** workflow](https://github.com/MasterBro07/Automatic-Web-Translator-claude/actions/workflows/build.yml?query=branch%3Amain)
+   [**Build** workflow](https://github.com/MasterBro07/Offline-Chinese-Screen-Translator/actions/workflows/build.yml?query=branch%3Amain)
    instead and download the two **Artifacts** at the bottom (requires a GitHub sign-in).
 2. Unzip both (right-click → **Extract All…**) to a permanent place, for example
    `C:\AutoTranslator\app` and `C:\AutoTranslator\extension`. Do not delete or move these folders later.

@@ -1,4 +1,6 @@
-# AutoTranslator
+# Offline Chinese Screen Translator
+
+*Das Programm selbst heißt **AutoTranslator**.*
 
 *English version: [README.md](README.md)*
 

@@ -23,7 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Kestrel for the local fake of the Anthropic Messages API -->
+    <!-- ASP.NET Core types used by the bridge tests -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 

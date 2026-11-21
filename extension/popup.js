@@ -11,7 +11,6 @@
   const siteName = $('site-name');
   const pageEngine = $('page-engine');
   const engineHint = $('engine-hint');
-  const premiumBox = $('use-premium');
   let hostname = '';
 
   // ------------------------------------------------------------ language pack
@@ -33,8 +32,7 @@
     // Which engine translates web pages right now.
     const engine = state && typeof state.pageEngine === 'string' ? state.pageEngine : 'chrome';
     const viaApp = connected && engine !== 'chrome';
-    pageEngine.textContent = !viaApp ? 'Chrome-Übersetzer'
-      : engine === 'claude' ? 'Claude über Desktop-App' : 'Desktop-App';
+    pageEngine.textContent = viaApp ? 'Desktop-App' : 'Chrome-Übersetzer';
     pageEngine.dataset.state = viaApp || (state && state.ready) ? 'available' : 'off';
     engineHint.textContent = viaApp
       ? 'Chinesisch → Englisch über die Desktop-App. Fällt sie aus, übersetzt Chrome direkt auf diesem Gerät.'
@@ -44,7 +42,7 @@
   chrome.storage.local.get('engineState').then((r) => renderApp(r.engineState));
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'local' && changes.engineState) renderApp(changes.engineState.newValue);
-    if (area === 'sync' && (changes.enabled || changes.disabledHosts || changes.usePremium)) loadSettings();
+    if (area === 'sync' && (changes.enabled || changes.disabledHosts)) loadSettings();
   });
   // Wakes the engine if necessary and refreshes its state.
   chrome.runtime.sendMessage({ type: 'recheck', apiPresent: 'Translator' in self }).catch(() => {});
@@ -52,20 +50,15 @@
   // ----------------------------------------------------------------- switches
 
   async function loadSettings() {
-    const settings = await chrome.storage.sync.get(['enabled', 'disabledHosts', 'usePremium']);
+    const settings = await chrome.storage.sync.get(['enabled', 'disabledHosts']);
     const disabledHosts = Array.isArray(settings.disabledHosts) ? settings.disabledHosts : [];
     enabledBox.checked = settings.enabled !== false;
-    premiumBox.checked = settings.usePremium !== false;
     siteBox.checked = !!hostname && disabledHosts.includes(hostname);
     siteBox.disabled = !enabledBox.checked;
   }
 
   enabledBox.addEventListener('change', () => {
     chrome.storage.sync.set({ enabled: enabledBox.checked });
-  });
-
-  premiumBox.addEventListener('change', () => {
-    chrome.storage.sync.set({ usePremium: premiumBox.checked });
   });
 
   siteBox.addEventListener('change', async () => {

@@ -127,75 +127,33 @@ UI strings are German (the user is German). Code, comments and docs are English.
 
 ---
 
-# Version 2 additions: Claude engine, page translation through the app
+# Version 2 additions
 
-The user chose Claude Haiku (`claude-haiku-5-5`, Anthropic API, own API key) as an optional
-higher-quality engine. The key lives only in the desktop app (DPAPI-protected). Web pages
-use it through the bridge, so the key is entered once and never stored in the extension.
-
-Engines: `"Chrome"` (default, free, on-device) and `"Claude"` (API). With `"Claude"`, the
-Chrome engine remains the fallback whenever Claude fails (no key, network, limit reached).
+Translation is on-device only (Chrome's built-in Translator API via the extension). An optional
+Claude API engine existed for a while and was removed at the user's request; nothing leaves the PC.
 
 ## Bridge protocol version 2 (superset of version 1)
 
-`hello` now carries `"version":2`. The app accepts version 1 clients (they just never send
-the new messages). New messages:
+`hello` carries `"version":2`. The app accepts version 1 clients. Version 2 adds messages that
+would let the app offer a better engine for web pages. The app currently has no such engine, so it
+always announces `premium:false`, and `page-translate` is answered with `page-error`. The
+extension keeps this path dormant and translates pages on-device.
 
 | Direction | Message |
 |---|---|
-| app → ext | `{"type":"app-state","premium":true,"engine":"claude"}` — sent right after the client's `hello` and whenever it changes. `premium:true` means the app can translate page text with a better engine than the on-device one. |
+| app → ext | `{"type":"app-state","premium":false,"engine":"chrome"}` — sent right after a version 2 client's `hello` |
 | ext → app | `{"type":"page-translate","id":"p7","source":"zh","target":"en","texts":["..."]}` — only while `premium` is true |
 | app → ext | `{"type":"page-result","id":"p7","translations":["..."]}` (same order and length) |
-| app → ext | `{"type":"page-error","id":"p7","message":"..."}` → the extension falls back to the on-device translator for that batch |
-
-Trust: any `chrome-extension://` origin may connect, but `page-translate` spends the user's
-API credit. The app pins the first origin that connects (trust on first use, stored in
-settings as `TrustedExtensionOrigin`); `page-translate` from any other origin is answered
-with `page-error`. The tray menu can reset the pinned origin.
+| app → ext | `{"type":"page-error","id":"p7","message":"..."}` → the extension uses the on-device translator for that batch |
 
 ## Core public API additions
 
 ```csharp
-public sealed class AppSettings {            // new properties (old ones unchanged)
-    public string Engine { get; set; } = "Chrome";            // "Chrome" | "Claude"
-    public string ClaudeModel { get; set; } = "claude-haiku-5-5";
-    public long ClaudeDailyCharLimit { get; set; } = 300000;  // source chars per day; 0 = unlimited
-    public bool MergeLines { get; set; } = true;
-    public string? TrustedExtensionOrigin { get; set; }
-}
+public sealed class AppSettings { public bool MergeLines { get; set; } = true; }
 
-public sealed class UsageTracker {            // thread-safe, per-day counter persisted as JSON
-    public UsageTracker(string? filePath = null, long dailyCharLimit = 0);
-    public long DailyCharLimit { get; set; }
-    public long CharsToday { get; }           // resets when the local date changes
-    public bool TryConsume(long chars);       // false (and nothing consumed) when over the limit
-    public event EventHandler? Changed;
-    public void Save();                       // never throws
-}
-
-public sealed class ClaudeTranslatorOptions {
-    public string Model { get; set; } = "claude-haiku-5-5";
-    public Uri? BaseUrl { get; set; }         // tests point this at a local fake server
-    public int MaxBatchItems { get; set; } = 60;
-    public int MaxBatchChars { get; set; } = 6000;
-    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(30);
-}
-
-public sealed class ClaudeTranslator : ITranslator {
-    // apiKeyProvider returns null/empty when no key is configured → IsReady false.
-    public ClaudeTranslator(Func<string?> apiKeyProvider, ClaudeTranslatorOptions? options = null,
-                            UsageTracker? usage = null);
-    public void NotifyKeyChanged();           // re-evaluates IsReady, raises StatusChanged
-    public Task<string?> TestAsync(CancellationToken ct); // null = OK, else a German error text
-}
-
-public sealed class FallbackTranslator : ITranslator {  // primary when ready, else/on error fallback
-    public FallbackTranslator(ITranslator primary, ITranslator fallback);
-}
-
-public sealed class CachingTranslator {       // new optional parameter
+public sealed class CachingTranslator {       // optional parameter
     public CachingTranslator(ITranslator inner, TranslationCache cache, string? engineTag = null);
-    // engineTag is appended to the cache's target key ("en|claude") so engines do not share entries
+    // engineTag is appended to the cache's target key so engines would not share entries
 }
 
 public static class RegionMerger {            // merges OCR lines of one paragraph into one region
@@ -204,18 +162,14 @@ public static class RegionMerger {            // merges OCR lines of one paragra
 
 public sealed class PipelineOptions { public bool MergeLines { get; set; } = true; }
 
-public sealed class ChromeBridgeServer {      // additions
+public sealed class ChromeBridgeServer {      // protocol 2 hooks (unused by the app today)
     public bool OffersPremiumEngine { get; set; }      // drives app-state.premium
     public string? TrustedOrigin { get; set; }         // null → pin the first origin that connects
-    public event Action<string>? OriginPinned;         // raised once when an origin gets pinned
+    public event Action<string>? OriginPinned;
     public Func<IReadOnlyList<string>, string, string, CancellationToken,
                 Task<IReadOnlyList<string>>>? PageTranslateHandler { get; set; }
 }
 ```
-
-`ClaudeTranslator` sends one request per batch with all texts as a JSON array and asks for a
-JSON array of the same length (structured output), telling the model the lines come from one
-screen/page, may contain OCR errors, and must be translated to natural, concise English.
 
 ## Overlay window and screen capture
 

@@ -298,14 +298,14 @@ public class ChromeBridgeServerV2Tests : IAsyncLifetime
     [Fact]
     public async Task PageTranslate_HandlerError_IsReportedWithItsMessage()
     {
-        EnablePremium((_, _, _, _) => throw new InvalidOperationException("Tageslimit für Claude erreicht"));
+        EnablePremium((_, _, _, _) => throw new InvalidOperationException("Übersetzung fehlgeschlagen"));
         var socket = await ConnectV2Async();
 
         await SendAsync(socket, PageRequest("p1", "你好"));
         var answer = await ReceiveAsync(socket);
 
         Assert.Equal("page-error", TypeOf(answer));
-        Assert.Equal("Tageslimit für Claude erreicht", answer.GetProperty("message").GetString());
+        Assert.Equal("Übersetzung fehlgeschlagen", answer.GetProperty("message").GetString());
 
         // The connection survives.
         await SendAsync(socket, """{"type":"ping"}""");

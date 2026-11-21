@@ -186,7 +186,7 @@ async function fakeChecks() {
     if (welcome) {
       const wtxt = await welcome.innerText('body');
       ok(/Sprachpaket laden/.test(wtxt) && /Desktop-App/.test(wtxt), 'welcome page shows German steps');
-      ok(/Claude/.test(wtxt) && /API-Schlüssel/.test(wtxt), 'welcome page mentions the optional Claude engine of the desktop app');
+      ok(!/Claude|API-Schlüssel/.test(wtxt), 'welcome page does not mention Claude or API keys');
     }
 
     // --- 1. simulate missing Translator API: offscreen -> tab -> none
@@ -305,7 +305,7 @@ async function fakeChecks() {
     ok(/Sprachpaket/.test(ptxt) && /Desktop-App/.test(ptxt) && /Webseiten automatisch übersetzen/.test(ptxt), 'popup renders German UI');
     ok((await popup.textContent('#app-status')) === 'verbunden', 'popup: Desktop-App verbunden', await popup.textContent('#app-status'));
     ok((await popup.textContent('#page-engine')) === 'Chrome-Übersetzer', 'popup: Webseiten: Chrome-Übersetzer (no premium)', await popup.textContent('#page-engine'));
-    ok(await popup.isChecked('#use-premium') && /Bessere Übersetzung der Desktop-App verwenden, wenn verfügbar/.test(ptxt), 'popup: premium setting present, default on');
+    ok(!(await popup.$('#use-premium')) && !/Claude|API-Schlüssel/.test(ptxt), 'popup: no premium setting, no Claude/API mention');
     console.log('INFO popup pack status (real API):', await popup.textContent('#pack-status'), '| button visible:', await popup.isVisible('#download'), '| hint visible:', await popup.isVisible('#api-hint'));
     await popup.uncheck('#enabled');
     ok(await until(async () => (await page.textContent('#h')) === '  你好世界  '), 'popup toggle switches page translation off');
@@ -319,7 +319,7 @@ async function fakeChecks() {
     setAppState({ premium: true, engine: 'claude' });
     const prem = await stateIs((x) => x.premium && x.pageEngine === 'claude' && x);
     ok(prem && prem.pagesReady && prem.ready, 'v2: app-state premium:true -> engineState premium, pageEngine claude', JSON.stringify(await engineState()));
-    ok(await until(async () => (await popup.textContent('#page-engine')) === 'Claude über Desktop-App', 4000), 'popup: Webseiten: Claude über Desktop-App', await popup.textContent('#page-engine'));
+    ok(await until(async () => (await popup.textContent('#page-engine')) === 'Desktop-App', 4000), 'popup: Webseiten: Desktop-App', await popup.textContent('#page-engine'));
     await sleep(1000);
     ok(app.pageReqs.length === 0 && (await page.textContent('#h')) === '  EN[你好世界]  ', 'v2: engine switch does not re-translate the page', JSON.stringify(sentTexts()));
     await page.evaluate(() => { document.getElementById('dyn').innerHTML = '<span id=n1>新文本</span><span id=n2>动态</span>'; });
@@ -460,13 +460,13 @@ async function fakeChecks() {
     ok(await until(async () => (await snap()).dyn === 'CL[错误回退]'), 'v2: an on-device fallback result is not cached as the app engine\'s result', (await snap()).dyn);
 
     // user setting off / on
-    await popup.uncheck('#use-premium');
+    await swEval(() => chrome.storage.sync.set({ usePremium: false }));
     ok(await stateIs((x) => x.pageEngine === 'chrome' && x.premium === true && x.usePremium === false), 'setting off: pageEngine chrome although the app offers premium', JSON.stringify(await engineState()));
     ok(await until(async () => (await popup.textContent('#page-engine')) === 'Chrome-Übersetzer'), 'popup shows Chrome-Übersetzer when the setting is off');
     app.pageReqs.length = 0;
     await page.evaluate(() => { document.getElementById('dyn').textContent = '设置关闭'; });
     ok(await until(async () => (await snap()).dyn === 'EN[设置关闭]') && app.pageReqs.length === 0, 'setting off: pages use the on-device translator, nothing is sent to the app');
-    await popup.check('#use-premium');
+    await swEval(() => chrome.storage.sync.set({ usePremium: true }));
     ok(await stateIs((x) => x.pageEngine === 'claude'), 'setting on again: pageEngine claude');
     await popup.screenshot({ path: path.join(os.tmpdir(), 'atx-popup.png') }).catch(() => {});
     await popup.close();

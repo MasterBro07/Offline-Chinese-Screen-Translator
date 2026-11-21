@@ -10,16 +10,14 @@ using AutoTranslator.Core;
 namespace AutoTranslator.Desktop;
 
 /// <summary>
-/// Application entry point: wires settings, cache, Chrome bridge, Claude engine, text source,
+/// Application entry point: wires settings, cache, Chrome bridge, text source,
 /// pipeline, overlay, tray icon and hotkey together. There is no main window.
 /// </summary>
-public partial class App : Application, ISettingsHost
+public partial class App : Application
 {
     private const string MutexName = "Local\\AutoTranslator.SingleInstance";
     private const string AppTitle = "AutoTranslator";
-    private const string CacheTagClaude = "claude";
 
-    private static readonly TimeSpan UsageSaveInterval = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan SessionEndStopTimeout = TimeSpan.FromSeconds(2);
 
     private readonly SemaphoreSlim _pipelineGate = new SemaphoreSlim(1, 1);
@@ -33,17 +31,7 @@ public partial class App : Application, ISettingsHost
     private ChromeBridgeServer? _bridge;
     private string? _bridgeError;
 
-    // Engines. All of them are created once at startup; switching the engine only changes
-    // which one the pipeline gets (_translator).
-    private ApiKeyStore? _keyStore;
-    private UsageTracker? _usage;
-    private ClaudeTranslator? _claude;
-    private ITranslator? _chromeTranslator;      // cache → Chrome extension
-    private ITranslator? _claudeTranslator;      // cache → Claude, Chrome extension as fallback
-    private ITranslator? _claudePageTranslator;  // cache → Claude only (web pages; the extension falls back itself)
-    private ITranslator? _translator;            // the one the pipeline uses right now
-    private int _usageDirty;
-    private DateTime _usageSavedUtc = DateTime.UtcNow;
+    private ITranslator? _translator;            // cache → Chrome extension (on-device)
 
     private OverlayWindow? _overlay;
     private ITextSource? _source;
@@ -53,7 +41,6 @@ public partial class App : Application, ISettingsHost
     private GlobalHotkey? _hotkey;
     private bool _hotkeyFailed;
     private HelpWindow? _helpWindow;
-    private SettingsWindow? _settingsWindow;
     private DispatcherTimer? _statusTimer;
     private DispatcherTimer? _saveTimer;
 
@@ -113,45 +100,16 @@ public partial class App : Application, ISettingsHost
         _settings = AppSettings.Load(_settingsPath);
         _settings.TextSourceMode = NormalizeMode(_settings.TextSourceMode);
         _settings.CaptureScope = NormalizeScope(_settings.CaptureScope);
-        _settings.Engine = NormalizeEngine(_settings.Engine);
-        if (_settings.ClaudeDailyCharLimit < 0)
-        {
-            _settings.ClaudeDailyCharLimit = 0;
-        }
 
         _cache = new TranslationCache(20000, Path.Combine(directory, "cache.json"));
         _cache.Load();
+        DeleteLeftoversOfClaudeEngine(directory);
 
-        _keyStore = new ApiKeyStore(Path.Combine(directory, "claude.key"));
-        _usage = new UsageTracker(Path.Combine(directory, "usage.json"), _settings.ClaudeDailyCharLimit);
-        _usage.Changed += OnUsageTrackerChanged;
-
-        // The bridge is always started: it is the free engine, the fallback for Claude, and the
-        // way web pages in Chrome reach Claude.
+        // The Chrome extension is the translation engine: it translates on this PC with Chrome's
+        // built-in translator and connects to this app over a localhost WebSocket.
         _bridge = new ChromeBridgeServer(_settings.BridgePort);
-        _bridge.TrustedOrigin = string.IsNullOrWhiteSpace(_settings.TrustedExtensionOrigin)
-            ? null
-            : _settings.TrustedExtensionOrigin;
-        _bridge.OriginPinned += OnBridgeOriginPinned;
-        _bridge.PageTranslateHandler = TranslatePageAsync;
-
-        var claudeOptions = new ClaudeTranslatorOptions();
-        if (!string.IsNullOrWhiteSpace(_settings.ClaudeModel))
-        {
-            claudeOptions.Model = _settings.ClaudeModel.Trim();
-        }
-
-        _claude = new ClaudeTranslator(_keyStore.Get, claudeOptions, _usage);
-
-        _chromeTranslator = new CachingTranslator(_bridge, _cache);
-        _claudePageTranslator = new CachingTranslator(_claude, _cache, CacheTagClaude);
-        // Each engine caches under its own tag, so a Chrome fallback result is never stored as a Claude one.
-        _claudeTranslator = new FallbackTranslator(_claudePageTranslator, _chromeTranslator);
-        ApplyEngineState();
-
-        // Subscribed at the two real engines, so every wrapper combination is covered.
+        _translator = new CachingTranslator(_bridge, _cache);
         _bridge.StatusChanged += OnTranslatorStatusChanged;
-        _claude.StatusChanged += OnTranslatorStatusChanged;
 
         try
         {
@@ -175,9 +133,7 @@ public partial class App : Application, ISettingsHost
         _tray.ToggleRequested += OnToggleRequested;
         _tray.ModeSelected += OnModeSelected;
         _tray.ScopeSelected += OnScopeSelected;
-        _tray.EngineSelected += OnEngineSelected;
-        _tray.SettingsRequested += OnSettingsRequested;
-        _tray.RepairRequested += OnRepairRequested;
+        _tray.MergeLinesToggled += OnMergeLinesToggled;
         _tray.HelpRequested += OnHelpRequested;
         _tray.ExitRequested += OnExitRequested;
 
@@ -216,256 +172,6 @@ public partial class App : Application, ISettingsHost
                 "Strg+Alt+T wird schon von einem anderen Programm benutzt. "
                 + "Ein- und Ausschalten geht über das Menü dieses Symbols (Rechtsklick).");
         }
-    }
-
-    // ------------------------------------------------------------------ engines
-
-    private bool IsClaudeSelected
-    {
-        get { return string.Equals(_settings.Engine, TrayController.EngineClaude, StringComparison.Ordinal); }
-    }
-
-    /// <summary>
-    /// Selects the translator for the pipeline and tells the extension whether web pages can be
-    /// translated through this app. Call after every engine or key change. UI thread only.
-    /// </summary>
-    private void ApplyEngineState()
-    {
-        bool claude = IsClaudeSelected;
-        _translator = claude ? _claudeTranslator : _chromeTranslator;
-
-        ChromeBridgeServer? bridge = _bridge;
-        if (bridge != null)
-        {
-            bool premium = claude && _keyStore != null && _keyStore.HasKey;
-            if (bridge.OffersPremiumEngine != premium)
-            {
-                bridge.OffersPremiumEngine = premium;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Translates web page text for the extension (bridge message "page-translate"). Runs on a
-    /// background thread. Uses the same cache entries and the same daily limit as the screen
-    /// translation. Throwing makes the bridge answer "page-error", and the extension then uses
-    /// its own on-device translator for that batch.
-    /// </summary>
-    private async Task<IReadOnlyList<string>> TranslatePageAsync(
-        IReadOnlyList<string> texts, string sourceLanguage, string targetLanguage, CancellationToken ct)
-    {
-        ITranslator? translator = _claudePageTranslator;
-        ApiKeyStore? keyStore = _keyStore;
-        if (_exiting || translator == null || keyStore == null || !IsClaudeSelected || !keyStore.HasKey)
-        {
-            throw new InvalidOperationException("Claude ist in AutoTranslator nicht eingeschaltet.");
-        }
-
-        return await translator.TranslateAsync(texts, sourceLanguage, targetLanguage, ct).ConfigureAwait(false);
-    }
-
-    private void OnBridgeOriginPinned(string origin)
-    {
-        // Raised on a background thread.
-        try
-        {
-            Dispatcher.BeginInvoke(new Action(() =>
-            {
-                if (_exiting)
-                {
-                    return;
-                }
-
-                _settings.TrustedExtensionOrigin = origin;
-                SaveSettings();
-                Log.Info("Chrome extension paired: " + origin);
-            }));
-        }
-        catch (Exception ex)
-        {
-            Log.Error("Storing the paired extension failed", ex);
-        }
-    }
-
-    private void OnUsageTrackerChanged(object? sender, EventArgs e)
-    {
-        // Raised on background threads; the status timer writes the file a little later.
-        Interlocked.Exchange(ref _usageDirty, 1);
-    }
-
-    private void SaveUsageIfDirty()
-    {
-        UsageTracker? usage = _usage;
-        if (usage == null || Volatile.Read(ref _usageDirty) == 0)
-        {
-            return;
-        }
-
-        DateTime now = DateTime.UtcNow;
-        if (now - _usageSavedUtc < UsageSaveInterval)
-        {
-            return;
-        }
-
-        _usageSavedUtc = now;
-        Interlocked.Exchange(ref _usageDirty, 0);
-        Task.Run(() => usage.Save());
-    }
-
-    private async Task ChangeEngineAsync(string engine)
-    {
-        if (!_initialized || _exiting)
-        {
-            return;
-        }
-
-        string normalized = NormalizeEngine(engine);
-        if (!string.Equals(_settings.Engine, normalized, StringComparison.Ordinal))
-        {
-            _settings.Engine = normalized;
-            SaveSettings();
-            ApplyEngineState();
-            Log.Info("Engine changed to " + normalized);
-            await RestartPipelineAsync();
-        }
-
-        RefreshStatus();
-        if (_settingsWindow != null)
-        {
-            _settingsWindow.RefreshFromHost();
-        }
-    }
-
-    // ------------------------------------------------------------------ ISettingsHost
-
-    string ISettingsHost.Engine
-    {
-        get { return _settings.Engine; }
-    }
-
-    bool ISettingsHost.HasApiKey
-    {
-        get { return _keyStore != null && _keyStore.HasKey; }
-    }
-
-    long ISettingsHost.DailyCharLimit
-    {
-        get { return _settings.ClaudeDailyCharLimit; }
-    }
-
-    long ISettingsHost.CharsToday
-    {
-        get { return _usage != null ? _usage.CharsToday : 0; }
-    }
-
-    bool ISettingsHost.MergeLines
-    {
-        get { return _settings.MergeLines; }
-    }
-
-    event EventHandler? ISettingsHost.UsageChanged
-    {
-        add
-        {
-            if (_usage != null)
-            {
-                _usage.Changed += value;
-            }
-        }
-
-        remove
-        {
-            if (_usage != null)
-            {
-                _usage.Changed -= value;
-            }
-        }
-    }
-
-    async void ISettingsHost.SetEngine(string engine)
-    {
-        try
-        {
-            await ChangeEngineAsync(engine);
-        }
-        catch (Exception ex)
-        {
-            Log.Error("Changing the engine failed", ex);
-        }
-    }
-
-    bool ISettingsHost.SetApiKey(string? key)
-    {
-        if (!_initialized || _exiting || _keyStore == null)
-        {
-            return false;
-        }
-
-        bool persisted = _keyStore.Set(key);
-        Log.Info(_keyStore.HasKey ? "API key stored" : "API key removed");
-
-        if (_claude != null)
-        {
-            _claude.NotifyKeyChanged();
-        }
-
-        ApplyEngineState();
-        InvalidateSource();
-        RefreshStatus();
-        return persisted;
-    }
-
-    void ISettingsHost.SetDailyCharLimit(long limit)
-    {
-        if (!_initialized || _exiting)
-        {
-            return;
-        }
-
-        if (limit < 0)
-        {
-            limit = 0;
-        }
-
-        _settings.ClaudeDailyCharLimit = limit;
-        if (_usage != null)
-        {
-            _usage.DailyCharLimit = limit;
-        }
-
-        SaveSettings();
-        InvalidateSource();
-        RefreshStatus();
-    }
-
-    async void ISettingsHost.SetMergeLines(bool mergeLines)
-    {
-        if (!_initialized || _exiting || _settings.MergeLines == mergeLines)
-        {
-            return;
-        }
-
-        try
-        {
-            _settings.MergeLines = mergeLines;
-            SaveSettings();
-            await RestartPipelineAsync();
-        }
-        catch (Exception ex)
-        {
-            Log.Error("Changing the merge-lines option failed", ex);
-        }
-    }
-
-    Task<string?> ISettingsHost.TestClaudeAsync(CancellationToken ct)
-    {
-        ClaudeTranslator? claude = _claude;
-        if (claude == null)
-        {
-            return Task.FromResult<string?>("Das Programm ist noch nicht vollständig gestartet.");
-        }
-
-        return claude.TestAsync(ct);
     }
 
     // ------------------------------------------------------------------ pipeline
@@ -650,89 +356,28 @@ public partial class App : Application, ISettingsHost
         RefreshStatus();
     }
 
-    private async void OnEngineSelected(object? sender, string engine)
-    {
-        try
-        {
-            await ChangeEngineAsync(engine);
-
-            // Claude without a key cannot work: lead the user straight to the place to enter it.
-            if (IsClaudeSelected && _keyStore != null && !_keyStore.HasKey)
-            {
-                ShowSettings();
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Error("Changing the engine failed", ex);
-        }
-    }
-
-    private void OnSettingsRequested(object? sender, EventArgs e)
-    {
-        ShowSettings();
-    }
-
-    private void OnRepairRequested(object? sender, EventArgs e)
+    private async void OnMergeLinesToggled(object? sender, EventArgs e)
     {
         if (!_initialized || _exiting)
         {
             return;
         }
 
-        _settings.TrustedExtensionOrigin = null;
-        SaveSettings();
-        if (_bridge != null)
+        try
         {
-            _bridge.TrustedOrigin = null;
+            _settings.MergeLines = !_settings.MergeLines;
+            SaveSettings();
+            await RestartPipelineAsync();
         }
-
-        Log.Info("Extension pairing reset");
-        if (_tray != null)
+        catch (Exception ex)
         {
-            _tray.ShowNotification(
-                "Kopplung zurückgesetzt",
-                "Die nächste Chrome-Erweiterung, die sich verbindet, wird neu gekoppelt. "
-                + "Falls Webseiten danach nicht mit Claude übersetzt werden: Chrome einmal schließen und neu öffnen.");
+            Log.Error("Changing the merge-lines option failed", ex);
         }
     }
 
     private void OnHelpRequested(object? sender, EventArgs e)
     {
         ShowHelp();
-    }
-
-    private void ShowSettings()
-    {
-        if (!_initialized || _exiting)
-        {
-            return;
-        }
-
-        try
-        {
-            if (_settingsWindow == null)
-            {
-                _settingsWindow = new SettingsWindow(this);
-                _settingsWindow.Closed += OnSettingsWindowClosed;
-                _settingsWindow.Show();
-            }
-            else if (_settingsWindow.WindowState == WindowState.Minimized)
-            {
-                _settingsWindow.WindowState = WindowState.Normal;
-            }
-
-            _settingsWindow.Activate();
-        }
-        catch (Exception ex)
-        {
-            Log.Error("Opening the settings window failed", ex);
-        }
-    }
-
-    private void OnSettingsWindowClosed(object? sender, EventArgs e)
-    {
-        _settingsWindow = null;
     }
 
     private async void OnExitRequested(object? sender, EventArgs e)
@@ -789,7 +434,6 @@ public partial class App : Application, ISettingsHost
     private void OnStatusTimerTick(object? sender, EventArgs e)
     {
         RefreshStatus();
-        SaveUsageIfDirty();
     }
 
     private void InvalidateSource()
@@ -832,7 +476,7 @@ public partial class App : Application, ISettingsHost
         {
             _tray.Update(
                 _settings.Enabled, _settings.TextSourceMode, _settings.CaptureScope,
-                _settings.Engine, BuildEngineLabel(), BuildStatus(), !_hotkeyFailed);
+                _settings.MergeLines, BuildStatus(), !_hotkeyFailed);
         }
         catch (Exception ex)
         {
@@ -840,32 +484,10 @@ public partial class App : Application, ISettingsHost
         }
     }
 
-    /// <summary>True when Claude is selected and can translate right now (key present, limit not reached).</summary>
-    private bool IsClaudeWorking
-    {
-        get
-        {
-            ClaudeTranslator? claude = _claude;
-            return IsClaudeSelected && claude != null && claude.IsReady;
-        }
-    }
-
-    /// <summary>Short name of the engine that translates right now, for the tray.</summary>
-    private string BuildEngineLabel()
-    {
-        if (!IsClaudeSelected)
-        {
-            return "Chrome";
-        }
-
-        return IsClaudeWorking ? "Claude" : "Chrome (Claude nicht bereit)";
-    }
-
     /// <summary>Short one-line status for the tray menu and tooltip.</summary>
     private string BuildStatus()
     {
-        // With Claude working, a broken Chrome bridge only costs the fallback.
-        if (_bridgeError != null && !IsClaudeWorking)
+        if (_bridgeError != null)
         {
             return _bridgeError;
         }
@@ -919,28 +541,6 @@ public partial class App : Application, ISettingsHost
             chrome = "✗ Chrome-Erweiterung noch nicht bereit" + (detail.Length > 0 ? " – " + detail : string.Empty);
         }
 
-        string engine;
-        if (!IsClaudeSelected)
-        {
-            engine = "– Übersetzer: Chrome (kostenlos). Claude Haiku lässt sich unter „Einstellungen…“ einschalten";
-        }
-        else if (IsClaudeWorking)
-        {
-            engine = "✓ Übersetzer: Claude Haiku";
-        }
-        else
-        {
-            ClaudeTranslator? claude = _claude;
-            string detail = claude != null ? (claude.StatusText ?? string.Empty) : string.Empty;
-            if (_keyStore != null && !_keyStore.HasKey)
-            {
-                detail = "API-Schlüssel fehlt (siehe „Einstellungen…“)";
-            }
-
-            engine = "✗ Claude Haiku ist nicht bereit" + (detail.Length > 0 ? " – " + detail : string.Empty)
-                + ". Solange übersetzt Chrome";
-        }
-
         bool needsOcr = _settings.TextSourceMode != TrayController.ModeUiAutomation;
         string ocr;
         if (OcrTextSource.IsChineseOcrAvailable())
@@ -960,7 +560,7 @@ public partial class App : Application, ISettingsHost
             ? "✓ Übersetzung ist eingeschaltet"
             : "– Übersetzung ist pausiert (Strg+Alt+T)";
 
-        string result = chrome + Environment.NewLine + engine + Environment.NewLine + ocr
+        string result = chrome + Environment.NewLine + ocr
             + Environment.NewLine + active;
         if (_hotkeyFailed)
         {
@@ -991,7 +591,6 @@ public partial class App : Application, ISettingsHost
     private void OnSaveTimerTick(object? sender, EventArgs e)
     {
         TranslationCache? cache = _cache;
-        UsageTracker? usage = _usage;
         if (cache == null)
         {
             return;
@@ -1002,11 +601,6 @@ public partial class App : Application, ISettingsHost
         {
             try
             {
-                if (usage != null)
-                {
-                    usage.Save();
-                }
-
                 cache.Save();
             }
             catch (Exception ex)
@@ -1027,11 +621,6 @@ public partial class App : Application, ISettingsHost
         SaveSettings();
         try
         {
-            if (_usage != null)
-            {
-                _usage.Save();
-            }
-
             if (_cache != null)
             {
                 _cache.Save();
@@ -1074,11 +663,6 @@ public partial class App : Application, ISettingsHost
             if (_helpWindow != null)
             {
                 _helpWindow.Close();
-            }
-
-            if (_settingsWindow != null)
-            {
-                _settingsWindow.Close();
             }
 
             await StopPipelineAsync();
@@ -1125,18 +709,6 @@ public partial class App : Application, ISettingsHost
         if (_bridge != null)
         {
             _bridge.StatusChanged -= OnTranslatorStatusChanged;
-            _bridge.OriginPinned -= OnBridgeOriginPinned;
-            _bridge.PageTranslateHandler = null;
-        }
-
-        if (_claude != null)
-        {
-            _claude.StatusChanged -= OnTranslatorStatusChanged;
-        }
-
-        if (_usage != null)
-        {
-            _usage.Changed -= OnUsageTrackerChanged;
         }
     }
 
@@ -1268,6 +840,30 @@ public partial class App : Application, ISettingsHost
 
     // ------------------------------------------------------------------ helpers
 
+    /// <summary>
+    /// Earlier versions could store an Anthropic API key (DPAPI-encrypted) and a usage counter.
+    /// The Claude engine is gone, so remove those files instead of leaving a key lying around.
+    /// </summary>
+    private static void DeleteLeftoversOfClaudeEngine(string directory)
+    {
+        foreach (string name in new[] { "claude.key", "usage.json" })
+        {
+            string path = Path.Combine(directory, name);
+            try
+            {
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                    Log.Info("Removed " + name + " from an earlier version");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Removing " + name + " failed", ex);
+            }
+        }
+    }
+
     private static string NormalizeMode(string? mode)
     {
         if (string.Equals(mode, TrayController.ModeUiAutomation, StringComparison.OrdinalIgnoreCase))
@@ -1281,13 +877,6 @@ public partial class App : Application, ISettingsHost
         }
 
         return TrayController.ModeOcr;
-    }
-
-    private static string NormalizeEngine(string? engine)
-    {
-        return string.Equals(engine, TrayController.EngineClaude, StringComparison.OrdinalIgnoreCase)
-            ? TrayController.EngineClaude
-            : TrayController.EngineChrome;
     }
 
     private static string NormalizeScope(string? scope)

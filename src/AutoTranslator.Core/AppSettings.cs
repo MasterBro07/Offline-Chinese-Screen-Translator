@@ -23,15 +23,8 @@ public sealed class AppSettings
     public string CaptureScope { get; set; } = "ForegroundWindow";
     public bool Enabled { get; set; } = true;
 
-    /// <summary>"Chrome" (on-device, default) | "Claude" (Anthropic API, Chrome stays the fallback)</summary>
-    public string Engine { get; set; } = "Chrome";
-    public string ClaudeModel { get; set; } = "claude-haiku-5-5";
-    /// <summary>Source characters per day sent to Claude; 0 = unlimited.</summary>
-    public long ClaudeDailyCharLimit { get; set; } = 300000;
     /// <summary>Merge OCR lines of one paragraph before translating.</summary>
     public bool MergeLines { get; set; } = true;
-    /// <summary>Extension origin allowed to spend API credit through the bridge; null = pin the first one.</summary>
-    public string? TrustedExtensionOrigin { get; set; }
 
     /// <summary>%AppData%/AutoTranslator</summary>
     public static string DefaultDirectory { get; } = Path.Combine(
@@ -75,10 +68,6 @@ public sealed class AppSettings
         if (string.IsNullOrWhiteSpace(s.CaptureScope)) s.CaptureScope = d.CaptureScope;
         if (s.BridgePort is < 1 or > 65535) s.BridgePort = d.BridgePort;
         if (s.CaptureIntervalMs < 50) s.CaptureIntervalMs = d.CaptureIntervalMs;
-        s.Engine = string.Equals(s.Engine?.Trim(), "Claude", StringComparison.OrdinalIgnoreCase) ? "Claude" : "Chrome";
-        s.ClaudeModel = string.IsNullOrWhiteSpace(s.ClaudeModel) ? d.ClaudeModel : s.ClaudeModel.Trim();
-        if (s.ClaudeDailyCharLimit < 0) s.ClaudeDailyCharLimit = d.ClaudeDailyCharLimit;
-        s.TrustedExtensionOrigin = string.IsNullOrWhiteSpace(s.TrustedExtensionOrigin) ? null : s.TrustedExtensionOrigin.Trim();
         return s;
     }
 }

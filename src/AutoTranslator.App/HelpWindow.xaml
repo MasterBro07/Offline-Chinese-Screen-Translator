@@ -64,11 +64,6 @@
                 <TextBlock TextWrapping="Wrap" Margin="0,6,0,0"
                            Text="Danach AutoTranslator beenden und neu starten." />
 
-                <TextBlock FontSize="16" FontWeight="SemiBold" Margin="0,18,0,0"
-                           Text="Optional: bessere Übersetzung mit Claude Haiku" />
-                <TextBlock TextWrapping="Wrap" Margin="0,4,0,0"
-                           Text="Im Menü des Symbols gibt es den Punkt „Einstellungen…“. Dort kann statt Chrome der Übersetzer Claude Haiku von Anthropic eingeschaltet werden. Er übersetzt meist deutlich besser, braucht aber einen eigenen API-Schlüssel, kostet etwas Geld (etwa 0,03 Cent pro Bildschirm, mit einstellbarem Tageslimit) und sendet den sichtbaren chinesischen Text an Anthropic. Die Schritte 1 bis 3 bleiben trotzdem nötig; Chrome springt ein, wenn Claude nicht erreichbar ist." />
-
                 <TextBlock FontSize="16" FontWeight="SemiBold" Margin="0,18,0,0" Text="Bedienung" />
                 <TextBlock TextWrapping="Wrap" Margin="0,4,0,0"
                            Text="• AutoTranslator läuft als Symbol im Infobereich neben der Uhr (eventuell hinter dem Pfeil „^“). Rechtsklick auf das Symbol öffnet das Menü." />
@@ -76,6 +71,8 @@
                            Text="• Strg+Alt+T schaltet die Übersetzung jederzeit ein oder aus. Falls ein anderes Programm dieses Tastenkürzel schon benutzt, steht das oben unter „Aktueller Zustand“; dann bitte das Menü verwenden." />
                 <TextBlock TextWrapping="Wrap" Margin="0,2,0,0"
                            Text="• „Texterkennung“: OCR liest alles, was auf dem Bildschirm zu sehen ist. UI-Automation liest Texte direkt aus Programmen (genauer, funktioniert aber nicht überall). „Beides“ kombiniert die zwei Wege." />
+                <TextBlock TextWrapping="Wrap" Margin="0,2,0,0"
+                           Text="• „Zeilen zu Absätzen zusammenfassen“: übersetzt umgebrochene Absätze am Stück statt Zeile für Zeile (meist natürlicher). Bei Listen mit vielen kurzen Einträgen kann Ausschalten besser sein." />
                 <TextBlock TextWrapping="Wrap" Margin="0,2,0,0"
                            Text="• „Bereich“: nur das aktive Fenster (schneller) oder der ganze Hauptbildschirm." />
 

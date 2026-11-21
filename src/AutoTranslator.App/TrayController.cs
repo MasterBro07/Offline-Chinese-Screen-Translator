@@ -14,9 +14,6 @@ internal sealed class TrayController : IDisposable
     public const string ModeUiAutomation = "UiAutomation";
     public const string ModeBoth = "Both";
 
-    public const string EngineChrome = "Chrome";
-    public const string EngineClaude = "Claude";
-
     private const int MaxTooltipLength = 63; // NotifyIcon.Text limit
 
     private readonly NotifyIcon _notifyIcon;
@@ -28,9 +25,7 @@ internal sealed class TrayController : IDisposable
     private readonly ToolStripMenuItem _scopeWindowItem;
     private readonly ToolStripMenuItem _scopeMonitorItem;
     private readonly ToolStripMenuItem _statusItem;
-    private readonly ToolStripMenuItem _engineMenu;
-    private readonly ToolStripMenuItem _engineChromeItem;
-    private readonly ToolStripMenuItem _engineClaudeItem;
+    private readonly ToolStripMenuItem _mergeLinesItem;
 
     private readonly Icon _activeIcon;
     private readonly Icon _pausedIcon;
@@ -54,14 +49,9 @@ internal sealed class TrayController : IDisposable
         _modeBothItem = new ToolStripMenuItem("Beides");
         _modeBothItem.Click += (sender, e) => Raise(ModeSelected, ModeBoth);
 
-        _engineChromeItem = new ToolStripMenuItem("Chrome (kostenlos, auf diesem PC)");
-        _engineChromeItem.Click += (sender, e) => Raise(EngineSelected, EngineChrome);
-        _engineClaudeItem = new ToolStripMenuItem("Claude Haiku (bessere Qualität, eigener API-Schlüssel)");
-        _engineClaudeItem.Click += (sender, e) => Raise(EngineSelected, EngineClaude);
-
-        _engineMenu = new ToolStripMenuItem("Übersetzer: Chrome");
-        _engineMenu.DropDownItems.Add(_engineChromeItem);
-        _engineMenu.DropDownItems.Add(_engineClaudeItem);
+        _mergeLinesItem = new ToolStripMenuItem("Zeilen zu Absätzen zusammenfassen");
+        _mergeLinesItem.ToolTipText = "Übersetzt umgebrochene Absätze am Stück statt Zeile für Zeile.";
+        _mergeLinesItem.Click += (sender, e) => Raise(MergeLinesToggled);
 
         var modeMenu = new ToolStripMenuItem("Texterkennung");
         modeMenu.DropDownItems.Add(_modeOcrItem);
@@ -80,14 +70,6 @@ internal sealed class TrayController : IDisposable
         _statusItem = new ToolStripMenuItem("Status: wird gestartet …");
         _statusItem.Enabled = false;
 
-        var settingsItem = new ToolStripMenuItem("Einstellungen…");
-        settingsItem.Click += (sender, e) => Raise(SettingsRequested);
-
-        var repairItem = new ToolStripMenuItem("Erweiterung neu koppeln");
-        repairItem.ToolTipText = "Vergisst die bisher gekoppelte Chrome-Erweiterung. "
-            + "Die nächste Erweiterung, die sich verbindet, darf Webseiten mit Claude übersetzen.";
-        repairItem.Click += (sender, e) => Raise(RepairRequested);
-
         var helpItem = new ToolStripMenuItem("Einrichtung / Hilfe…");
         helpItem.Click += (sender, e) => Raise(HelpRequested);
 
@@ -99,14 +81,12 @@ internal sealed class TrayController : IDisposable
         _menu.Opened += (sender, e) => _menuOpen = true;
         _menu.Closed += (sender, e) => _menuOpen = false;
         _menu.Items.Add(_enabledItem);
-        _menu.Items.Add(_engineMenu);
         _menu.Items.Add(modeMenu);
         _menu.Items.Add(scopeMenu);
+        _menu.Items.Add(_mergeLinesItem);
         _menu.Items.Add(new ToolStripSeparator());
         _menu.Items.Add(_statusItem);
         _menu.Items.Add(new ToolStripSeparator());
-        _menu.Items.Add(settingsItem);
-        _menu.Items.Add(repairItem);
         _menu.Items.Add(helpItem);
         _menu.Items.Add(exitItem);
 
@@ -124,11 +104,7 @@ internal sealed class TrayController : IDisposable
 
     public event EventHandler<string>? ScopeSelected;
 
-    public event EventHandler<string>? EngineSelected;
-
-    public event EventHandler? SettingsRequested;
-
-    public event EventHandler? RepairRequested;
+    public event EventHandler? MergeLinesToggled;
 
     public event EventHandler? HelpRequested;
 
@@ -140,11 +116,9 @@ internal sealed class TrayController : IDisposable
         get { return _menuOpen; }
     }
 
-    /// <summary>Refreshes check marks, engine line, status line, icon and tooltip.</summary>
-    /// <param name="engine">Selected engine (<see cref="EngineChrome"/> or <see cref="EngineClaude"/>).</param>
-    /// <param name="engineLabel">Short name of the engine that is translating right now, e.g. "Claude".</param>
+    /// <summary>Refreshes check marks, status line, icon and tooltip.</summary>
     /// <param name="hotkeyAvailable">False when Ctrl+Alt+T is taken by another program.</param>
-    public void Update(bool enabled, string mode, string scope, string engine, string engineLabel,
+    public void Update(bool enabled, string mode, string scope, bool mergeLines,
                        string status, bool hotkeyAvailable)
     {
         if (_disposed)
@@ -162,14 +136,7 @@ internal sealed class TrayController : IDisposable
 
         _enabledItem.Checked = enabled;
 
-        bool claude = string.Equals(engine, EngineClaude, StringComparison.OrdinalIgnoreCase);
-        _engineClaudeItem.Checked = claude;
-        _engineChromeItem.Checked = !claude;
-        string engineLine = "Übersetzer: " + engineLabel;
-        if (_engineMenu.Text != engineLine)
-        {
-            _engineMenu.Text = engineLine;
-        }
+        _mergeLinesItem.Checked = mergeLines;
 
         _modeOcrItem.Checked = string.Equals(mode, ModeOcr, StringComparison.OrdinalIgnoreCase);
         _modeUiaItem.Checked = string.Equals(mode, ModeUiAutomation, StringComparison.OrdinalIgnoreCase);
@@ -191,8 +158,7 @@ internal sealed class TrayController : IDisposable
             _notifyIcon.Icon = icon;
         }
 
-        // The tooltip is limited to 63 characters, so the engine goes first and stays short.
-        string tooltip = Truncate("AutoTranslator · " + engineLabel + " · " + status, MaxTooltipLength);
+        string tooltip = Truncate("AutoTranslator · " + status, MaxTooltipLength);
         if (_notifyIcon.Text != tooltip)
         {
             _notifyIcon.Text = tooltip;

@@ -25,6 +25,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: Fetch offline OCR files (models + runtime, checked against npm integrity)
+        run: node tools/fetch-ocr-assets.mjs
+
       - name: Install Playwright
         shell: pwsh
         run: |

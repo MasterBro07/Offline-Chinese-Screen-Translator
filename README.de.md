@@ -104,6 +104,23 @@ Add-WindowsCapability -Online -Name "Language.OCR~~~zh-CN~0.0.1.0"
    und Texterkennung schon bereit sind.
 3. Das Programm läuft danach als rundes Symbol im Infobereich neben der Uhr (eventuell hinter dem Pfeil „^“).
 
+## Text in Bildern
+
+Shops packen viel Text in Bilder: Preise und Angebote in Bannern, Größen und Material in langen Detailbildern.
+Die Erweiterung übersetzt auch diese, automatisch und offline.
+
+- Größere Bilder im sichtbaren Bereich einer chinesischen Seite werden nacheinander gelesen, etwa 0,5 s pro
+  Bild (ein langes Detailbild dauert ein paar Sekunden). Das Englische erscheint als dunkle Kästchen über dem
+  Chinesischen.
+- Der kleine Knopf **原文** am Bild zeigt das Original, ein weiterer Klick wieder die Übersetzung.
+- **Rechtsklick auf ein Bild → „Bild übersetzen“** übersetzt ein einzelnes Bild sofort, auch kleine.
+- Abschalten lässt es sich im Popup der Erweiterung (*Bilder automatisch übersetzen*).
+
+Die Texterkennung (PaddleOCR PP-OCRv4 mit ONNX Runtime) steckt in der Erweiterung selbst; deshalb ist der
+Download der Erweiterung etwa 30 MB groß. Bilder werden auf dem eigenen PC gelesen und nie hochgeladen.
+Verzierte Schriften, sehr kleiner oder gebogener Text und Text auf unruhigem Hintergrund werden manchmal
+falsch gelesen.
+
 ## Auf Chinesisch schreiben
 
 Eine Nachricht an den Verkäufer, eine Suche im chinesischen Shop, ein Formular? Einfach auf Englisch tippen.
@@ -148,7 +165,8 @@ im Popup der Erweiterung (*Schreibhilfe in Eingabefeldern*).
 
 ## Für Entwickler
 
-Ein Ablaufdiagramm steht in [docs/workflow.svg](docs/workflow.svg). Aufbau und Schnittstellen sind in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) beschrieben (englisch).
+Vor dem Laden der Erweiterung aus einer Git-Kopie einmal `node tools/fetch-ocr-assets.mjs` ausführen;
+das lädt die Texterkennung für Bilder (ca. 29 MB, nicht im Git). Ein Ablaufdiagramm steht in [docs/workflow.svg](docs/workflow.svg). Aufbau und Schnittstellen sind in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) beschrieben (englisch).
 Das Windows-Programm wird von GitHub Actions gebaut (`.github/workflows/build.yml`).
 
 ## Lizenz

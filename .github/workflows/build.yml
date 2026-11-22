@@ -14,6 +14,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Fetch offline OCR files (models + runtime, checked against npm integrity)
+        run: node tools/fetch-ocr-assets.mjs
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:

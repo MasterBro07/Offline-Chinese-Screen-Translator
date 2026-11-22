@@ -190,6 +190,59 @@
     return run;
   }
 
+  // --------------------------------------------------------- text in images
+
+  const OCR_CACHE_CAPACITY = 300;
+  const OCR_MAX_BYTES = 25 * 1024 * 1024;
+  const ocrCache = new Map(); // image key -> { width, height, lines: [{ box, zh }] }
+  let ocrQueue = Promise.resolve();
+
+  /** Loads an image the page shows. Host permissions let the engine fetch it without CORS limits. */
+  async function loadImage(message) {
+    let blob;
+    if (typeof message.dataUrl === 'string') {
+      blob = await (await fetch(message.dataUrl)).blob();
+    } else {
+      const res = await fetch(message.url, { credentials: 'omit', referrerPolicy: 'no-referrer' });
+      if (!res.ok) throw new Error('image-http-' + res.status);
+      blob = await res.blob();
+    }
+    if (blob.size > OCR_MAX_BYTES) throw new Error('image-too-large');
+    const crop = message.crop;
+    if (crop && [crop.x, crop.y, crop.w, crop.h].every((v) => Number.isFinite(v)) && crop.w > 0 && crop.h > 0) {
+      return createImageBitmap(blob, Math.round(crop.x), Math.round(crop.y), Math.round(crop.w), Math.round(crop.h));
+    }
+    return createImageBitmap(blob);
+  }
+
+  /**
+   * OCR + translation of one image. Images are processed one at a time; recognised text is cached
+   * per image, translations come from the normal translation cache.
+   */
+  function ocrImage(message) {
+    const key = typeof message.dataUrl === 'string' ? null : String(message.url);
+    const run = ocrQueue.then(async () => {
+      let result = key ? ocrCache.get(key) : undefined;
+      if (!result) {
+        const bitmap = await loadImage(message);
+        try {
+          const lines = await AutoTranslatorOcr.recognize(bitmap);
+          result = { width: bitmap.width, height: bitmap.height, lines: lines.map((l) => ({ box: l.box, zh: l.text })) };
+        } finally {
+          bitmap.close();
+        }
+        if (key) {
+          ocrCache.set(key, result);
+          if (ocrCache.size > OCR_CACHE_CAPACITY) ocrCache.delete(ocrCache.keys().next().value);
+        }
+      }
+      const en = result.lines.length ? await enqueueBatch(result.lines.map((l) => l.zh), 'zh', 'en') : [];
+      return { width: result.width, height: result.height, lines: result.lines.map((l, i) => ({ box: l.box, zh: l.zh, en: en[i] })) };
+    });
+    ocrQueue = run.catch(() => {});
+    return run;
+  }
+
   // ------------------------------------------------- premium engine (the app)
 
   /** True while page batches should go to the desktop app. */
@@ -464,6 +517,13 @@
           sendResponse({ ok: false, notReady: !ready, error: String((e && e.message) || e) });
           recheck();
         },
+      );
+      return true;
+    }
+    if (message.type === 'engine.ocrImage') {
+      ocrImage(message).then(
+        (result) => sendResponse({ ok: true, ...result }),
+        (e) => sendResponse({ ok: false, notReady: !ready, error: String((e && e.message) || e) }),
       );
       return true;
     }

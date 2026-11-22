@@ -485,3 +485,7 @@ $RECYCLE.BIN/
 
 # Claude Code agent worktrees
 .claude/worktrees/
+
+# Offline OCR models and runtime (downloaded by tools/fetch-ocr-assets.mjs)
+extension/ocr/models/
+extension/ocr/ort/

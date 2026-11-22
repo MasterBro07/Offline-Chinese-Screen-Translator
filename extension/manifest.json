@@ -1,14 +1,15 @@
 {
   "manifest_version": 3,
   "name": "Auto Translator",
-  "version": "1.1.0",
-  "description": "Übersetzt chinesische Webseiten automatisch ins Englische, offline. Mit Schreibhilfe: Englisch tippen, Chinesisch einfügen.",
+  "version": "1.2.0",
+  "description": "Übersetzt chinesische Webseiten und Bilder automatisch ins Englische, offline. Schreibhilfe: Englisch tippen, Chinesisch einfügen.",
   "minimum_chrome_version": "138",
   "permissions": [
     "storage",
     "offscreen",
     "tabs",
-    "alarms"
+    "alarms",
+    "contextMenus"
   ],
   "background": {
     "service_worker": "background.js"
@@ -20,7 +21,8 @@
       ],
       "js": [
         "content.js",
-        "compose.js"
+        "compose.js",
+        "images.js"
       ],
       "all_frames": true,
       "match_about_blank": true,
@@ -41,5 +43,11 @@
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
+  },
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
   }
 }

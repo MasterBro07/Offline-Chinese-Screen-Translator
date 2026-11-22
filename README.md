@@ -34,6 +34,7 @@ No account, no API key, no subscription, and no screen text is ever uploaded.
 - [Why offline matters](#why-offline-matters)
 - [What you get](#what-you-get)
 - [Which part should I use?](#which-part-should-i-use)
+- [Text in images](#text-in-images)
 - [Writing in Chinese](#writing-in-chinese)
 - [Requirements](#requirements)
 - [Installation tutorial](#installation-tutorial)
@@ -54,6 +55,7 @@ Online translators send all of that to a server. AutoTranslator does not.
 |---|---|---|
 | Reading text on screen (OCR) | Windows' built-in text recognition | **No** |
 | Translating Chinese ↔ English | Chrome's built-in on-device translator | **No**, after a one-time language pack download |
+| Reading text in images | Text recognition model built into the extension (PaddleOCR) | **No**, the model ships with the extension |
 | App ↔ Chrome extension | WebSocket on `127.0.0.1` (your own PC) | **No**, only accepts the Chrome extension |
 | Settings and translation cache | Files in `%AppData%\AutoTranslator` | **No** |
 | Telemetry, accounts, API keys | none | — |
@@ -68,6 +70,8 @@ helper), which Chrome fetches once from Google when you click **"Sprachpakete la
 - **Websites:** the Chrome extension replaces Chinese text on the page itself, including text loaded later
   (infinite scroll, pop-ups, chats), iframes, drop-down menus and image captions. Input fields and passwords
   are never touched.
+- **Text in images:** Chinese text in product photos, banners and long detail pictures is recognised and
+  translated automatically; the English is drawn right over it. See [Text in images](#text-in-images).
 - **Writing in Chinese:** type English into a text field on a Chinese page and the Chinese translation
   appears right below it; one click inserts it. See [Writing in Chinese](#writing-in-chinese).
 - **Windows programs:** the desktop app reads the active window and draws the English text on a transparent
@@ -164,6 +168,21 @@ Windows needs its Chinese OCR component to read Chinese characters on screen. Ch
 > **Tip:** to start AutoTranslator with Windows, press `Win + R`, type `shell:startup`, press Enter and put a
 > shortcut to `AutoTranslator.exe` into that folder.
 
+## Text in images
+
+Shops put a lot of their text into pictures: prices and offers in banners, sizes and materials in long
+detail images. The extension translates those too, automatically and offline.
+
+- Larger images near the visible part of a Chinese page are read one after another, about 0.5 s per
+  picture (a long detail image takes a few seconds). The English appears as dark boxes over the Chinese.
+- The small **原文** button on an image shows the original; click again for the translation.
+- **Right-click an image → "Bild übersetzen"** translates a single image at once, also small ones.
+- Turn it off in the extension popup (*Bilder automatisch übersetzen*).
+
+The text recognition (PaddleOCR PP-OCRv4, run with ONNX Runtime) is built into the extension, which is
+why the extension download is about 30 MB. Images are read on your PC and never uploaded. Decorative fonts,
+very small or curved text and text on busy backgrounds can be misread.
+
 ## Writing in Chinese
 
 Need to message a seller, search a Chinese shop or fill in a form? Just type in English.
@@ -186,6 +205,8 @@ extension popup (*Schreibhilfe in Eingabefeldern*).
 | Choose how text is read | Tray menu → *Texterkennung*: **OCR** (reads everything visible, default), **UI-Automation** (reads text straight from the program, very exact but not supported everywhere), or **Beides** (both) |
 | Choose what is read | Tray menu → *Bereich*: **Aktives Fenster** (active window, faster) or **Ganzer Hauptbildschirm** (whole primary screen) |
 | Translate paragraphs as a whole | Tray menu → *Zeilen zu Absätzen zusammenfassen* (on by default; turn off for lists with many short entries) |
+| Show the original text of an image | Click **原文** on the image (again for the translation) |
+| Translate one particular image | Right-click it → **Bild übersetzen** |
 | Write Chinese in a text field | Type English, then **Einfügen** or **Ctrl + Shift + Enter** (see [Writing in Chinese](#writing-in-chinese)) |
 | Pause websites in Chrome | Click the extension icon → untick *Webseiten automatisch übersetzen*, or disable it for one site only |
 | See status and setup help | Tray menu → *Einrichtung / Hilfe…* (or double-click the tray icon) |
@@ -246,7 +267,9 @@ The local connection only accepts Chrome extensions (`chrome-extension://` origi
 - Release: run the [`Release`](.github/workflows/release.yml) workflow by hand (Actions → Release →
   *Run workflow*); it builds both parts and publishes them as ZIP files on a new GitHub Release.
 - Core tests run on any OS: `dotnet test tests/AutoTranslator.Core.Tests`
-- Extension tests: `npm i playwright ws && node extension-tests/run.js`
+- Before loading the extension from a git checkout, fetch the offline OCR files (about 29 MB, not in git):
+  `node tools/fetch-ocr-assets.mjs`. The workflows do this automatically for builds and releases.
+- Extension tests: `npm i playwright ws && node extension-tests/run.js` (includes real offline OCR checks)
 - Architecture and the bridge protocol: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ## License

@@ -75,10 +75,19 @@ function launch(profile) {
 
 function startFixtureServer() {
   const server = http.createServer((req, res) => {
-    const name = path.basename(new URL(req.url, 'http://x').pathname) || 'basic.html';
-    const file = path.join(FIXTURES, name);
+    const pathname = new URL(req.url, 'http://x').pathname;
+    const name = path.basename(pathname) || 'basic.html';
+    // /img/x.png: test images. /protected/x.png: only for requests with the page as referrer
+    // (like shop CDNs with hotlink protection), so the extension must use its screenshot fallback.
+    const isImage = pathname.startsWith('/img/') || pathname.startsWith('/protected/');
+    if (pathname.startsWith('/protected/') && !String(req.headers.referer || '').includes('/images.html')) {
+      server.imageRefusals = (server.imageRefusals || 0) + 1;
+      res.statusCode = 403; res.end('hotlink'); return;
+    }
+    const file = isImage ? path.join(FIXTURES, 'img', name) : path.join(FIXTURES, name);
     if (!fs.existsSync(file)) { res.statusCode = 404; res.end('not found'); return; }
-    res.setHeader('content-type', 'text/html; charset=utf-8');
+    if (isImage) server.imageRequests = (server.imageRequests || 0) + 1;
+    res.setHeader('content-type', isImage ? 'image/png' : 'text/html; charset=utf-8');
     res.end(fs.readFileSync(file));
   });
   return new Promise((resolve) => server.listen(0, () => resolve(server)));
@@ -96,7 +105,7 @@ function staticChecks() {
   const missing = [...new Set(refs)].filter((r) => !fs.existsSync(path.join(EXT, r)));
   ok(missing.length === 0, 'all referenced files exist', missing.join(','));
   const risky = [];
-  for (const f of fs.readdirSync(EXT).filter((f) => f.endsWith('.js'))) {
+  for (const f of [...fs.readdirSync(EXT).filter((f) => f.endsWith('.js')), 'ocr/ocr.js']) {
     let good = true;
     try { execFileSync(process.execPath, ['--check', path.join(EXT, f)]); } catch (e) { good = false; }
     ok(good, 'node --check ' + f);
@@ -393,6 +402,90 @@ async function fakeChecks() {
       await en.close();
     }
 
+    // --- 6c. text in images: real offline OCR (models ship with the extension), fake translator
+    {
+      const ip = await ctx.newPage();
+      await ip.setViewportSize({ width: 1000, height: 800 });
+      const tImages = Date.now();
+      await ip.goto(base + 'images.html');
+      // Overlay boxes over the image with this id (matched by position), or null.
+      const overlay = (id) => ip.evaluate((id) => {
+        const img = document.getElementById(id);
+        const r = img.getBoundingClientRect();
+        const host = document.querySelector('auto-translator-images');
+        if (!host || !host.shadowRoot) return null;
+        for (const layer of host.shadowRoot.querySelectorAll('.layer')) {
+          if (layer.style.display === 'none') continue;
+          const lr = layer.getBoundingClientRect();
+          if (Math.abs(lr.left - r.left) < 2 && Math.abs(lr.top - r.top) < 2 && Math.abs(lr.width - r.width) < 2) {
+            const inner = layer.querySelector('.inner');
+            return {
+              off: inner.classList.contains('off'),
+              boxes: [...layer.querySelectorAll('.box')].map((b) => {
+                const br = b.getBoundingClientRect();
+                return { t: b.textContent, x: br.left - r.left, y: br.top - r.top, w: br.width, h: br.height };
+              }),
+            };
+          }
+        }
+        return null;
+      }, id);
+      const texts = async (id) => { const o = await overlay(id); return o ? o.boxes.map((b) => b.t).join(' | ') : null; };
+
+      ok(await until(async () => (await texts('clear')) === 'EN[限时特价] | EN[全场包邮]', 30000),
+        'images: text in a clear image is recognised and translated automatically', await texts('clear'));
+      console.log('INFO first image translated after', Date.now() - tImages, 'ms (includes loading the OCR models)');
+      const clear = await overlay('clear');
+      const near = (a, b, tol) => Math.abs(a - b) <= tol;
+      // clear.png is 640x240 shown at 320x120: the first line sits at about (21, 20), 86x21 px.
+      ok(clear && near(clear.boxes[0].x, 21, 8) && near(clear.boxes[0].y, 20, 8) && near(clear.boxes[1].y, 64, 8),
+        'images: boxes sit on the original text (scaled to the displayed size)', JSON.stringify(clear && clear.boxes));
+      ok(await until(async () => (await texts('banner')) === 'EN[新品上市] | EN[立即购买享八折优惠]', 15000),
+        'images: coloured banner with two text sizes', await texts('banner'));
+      ok(await until(async () => (await texts('fit')) === 'EN[限时特价] | EN[全场包邮]', 15000), 'images: object-fit: contain image translated', await texts('fit'));
+      const fit = await overlay('fit');
+      // 640x240 contained in 400x300: scale .625, picture starts 75 px down; first line at y ~ 100.
+      ok(fit && near(fit.boxes[0].y, 100, 8) && near(fit.boxes[0].x, 26, 8), 'images: object-fit offsets respected', JSON.stringify(fit && fit.boxes[0]));
+      ok(await until(async () => (await texts('protected')) === 'EN[新品上市] | EN[立即购买享八折优惠]', 20000) && server.imageRefusals > 0,
+        'images: hotlink-protected image translated through the screenshot fallback', String(await texts('protected')) + ' refusals=' + server.imageRefusals);
+      await sleep(2500);
+      ok((await overlay('icon')) === null, 'images: small images (icons) are skipped');
+      ok((await overlay('blank')) === null, 'images: image without text gets no overlay');
+      ok((await overlay('detail')) === null, 'images: images far below the viewport wait until they are scrolled near');
+
+      await ip.evaluate(() => document.getElementById('detail').scrollIntoView());
+      ok(await until(async () => (await texts('detail')) === 'EN[产品参数] | EN[面料：纯棉] | EN[尺码：均码] | EN[颜色：白色] | EN[洗涤说明] | EN[手洗不可漂白]', 30000),
+        'images: long detail image (tiled OCR) translated after scrolling', await texts('detail'));
+      await ip.evaluate(() => window.scrollTo(0, 0));
+      ok(await until(async () => { const o = await overlay('clear'); return o && near(o.boxes[0].y, 20, 8); }, 3000), 'images: overlays follow the page when scrolling');
+
+      await ip.locator('auto-translator-images .toggle').first().click();
+      ok(await until(async () => { const o = await overlay('clear'); return o && o.off; }, 3000), 'images: "原文" button shows the original');
+      await ip.locator('auto-translator-images .toggle').first().click();
+      ok(await until(async () => { const o = await overlay('clear'); return o && !o.off; }, 3000), 'images: and switches back to the translation');
+
+      await swEval(() => chrome.storage.sync.set({ images: false }));
+      ok(await until(async () => (await overlay('clear')) === null && (await overlay('banner')) === null, 4000), 'images: switch off removes all overlays');
+      await swEval(() => chrome.storage.sync.set({ images: true }));
+      ok(await until(async () => (await texts('clear')) === 'EN[限时特价] | EN[全场包邮]', 6000), 'images: switch on shows them again (from the cache)');
+
+      const menu = await swEval(() => new Promise((r) => chrome.contextMenus.update('translate-image', {}, () => r(!chrome.runtime.lastError))));
+      ok(menu === true, 'images: right-click menu "Bild übersetzen" exists');
+      await swEval(async (src) => {
+        const tabs = await chrome.tabs.query({});
+        const tab = tabs.find((t) => (t.url || '').includes('/images.html'));
+        await chrome.tabs.sendMessage(tab.id, { type: 'images.translateNow', srcUrl: src }, { frameId: 0 });
+      }, base + 'img/clear.png?icon');
+      ok(await until(async () => (await texts('icon')) === 'EN[限时特价] | EN[全场包邮]', 15000), 'images: right-click "Bild übersetzen" also translates a small image', await texts('icon'));
+
+      const tReload = Date.now();
+      await ip.reload();
+      ok(await until(async () => (await texts('clear')) === 'EN[限时特价] | EN[全场包邮]', 8000), 'images: after a reload the cached result appears again');
+      console.log('INFO overlay after reload took', Date.now() - tReload, 'ms');
+      ok((await ip.textContent('#h')) === 'EN[商品详情]', 'images: page text translation still works next to image overlays');
+      await ip.close();
+    }
+
     ok(app.pageReqs.length === 0, 'v2: no page-translate is ever sent while premium is false', String(app.pageReqs.length));
 
     // =================================================== protocol version 2
@@ -522,6 +615,15 @@ async function fakeChecks() {
       ok(Array.isArray(forged) && forged.slice(0, 4).every((r) => r === 'ignored'), 'service worker ignores engine.* / recheck messages from content scripts', JSON.stringify(forged));
       ok(Array.isArray(forged) && forged.slice(4, 7).every((r) => r && r.ok === false && r.error === 'bad-request'), 'service worker rejects malformed / oversized page batches', JSON.stringify(forged));
       ok(Array.isArray(forged) && forged[7] && forged[7].ok === true && forged[7].translations[0] === 'CL[验证]', 'service worker still serves a well-formed page batch', JSON.stringify(forged));
+      const forgedOcr = await csEval(`Promise.all([
+        chrome.runtime.sendMessage({ type: 'ocrImage', url: 'file:///etc/passwd' }),
+        chrome.runtime.sendMessage({ type: 'ocrImage', url: 'chrome://settings/' }),
+        chrome.runtime.sendMessage({ type: 'ocrImage', url: 'javascript:alert(1)' }),
+        chrome.runtime.sendMessage({ type: 'ocrImage', url: 'https://x/' + 'a'.repeat(9000) }),
+        chrome.runtime.sendMessage({ type: 'translate', source: 'fr', target: 'en', texts: ['x'] }),
+      ].map((p) => p.catch(() => 'threw')))`);
+      ok(Array.isArray(forgedOcr) && forgedOcr.every((r) => r && r.ok === false && r.error === 'bad-request'),
+        'service worker rejects image URLs other than http(s) and unsupported language pairs', JSON.stringify(forgedOcr));
       await sleep(500);
       ok(JSON.stringify(await engineState()) === stateBefore && (await local('engineMode')).engineMode === 'offscreen' && await swEval(() => chrome.offscreen.hasDocument()),
         'forged messages changed neither the engine state nor the engine host');

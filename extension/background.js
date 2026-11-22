@@ -157,6 +157,43 @@ const MAX_REQUEST_CHARS = 100000;
 // writing helper (English -> Chinese).
 const ALLOWED_PAIRS = new Set(['zh>en', 'zh-Hant>en', 'en>zh']);
 
+const MAX_IMAGE_URL = 8192;
+const MENU_IMAGE = 'translate-image';
+
+/** http(s) image URL a content script may ask the engine to read. */
+function validImageUrl(url) {
+  if (typeof url !== 'string' || url.length > MAX_IMAGE_URL) return false;
+  try {
+    const u = new URL(url);
+    return u.protocol === 'https:' || u.protocol === 'http:';
+  } catch (e) {
+    return false;
+  }
+}
+
+/** A rectangle in the tab's visible area (CSS pixels), for the screenshot fallback. */
+function validRect(r) {
+  return !!r && ['x', 'y', 'w', 'h'].every((k) => Number.isFinite(r[k]))
+    && r.w >= 1 && r.h >= 1 && r.w <= 20000 && r.h <= 20000;
+}
+
+/**
+ * Screenshot fallback for images the engine cannot download (hotlink protection, blob: URLs):
+ * crop the image's visible rectangle out of a capture of the tab. Top frame only, because only
+ * there are the content script's coordinates the same as the tab's.
+ */
+async function captureImage(message, sender) {
+  if (!sender.tab || sender.frameId !== 0 || !validRect(message.rect)) throw new Error('no-capture');
+  const dpr = Number.isFinite(message.dpr) && message.dpr > 0 && message.dpr <= 8 ? message.dpr : 1;
+  const dataUrl = await chrome.tabs.captureVisibleTab(sender.tab.windowId, { format: 'png' });
+  const r = message.rect;
+  return sendToEngine({
+    type: 'engine.ocrImage',
+    dataUrl,
+    crop: { x: r.x * dpr, y: r.y * dpr, w: r.w * dpr, h: r.h * dpr },
+  });
+}
+
 function fromExtensionPage(sender) {
   return typeof sender.url === 'string' && sender.url.startsWith(EXTENSION_BASE);
 }
@@ -234,6 +271,24 @@ async function handleMessage(message, sender) {
         return { ok: false, notReady: true, error: noApi ? 'no-api' : String(e && e.message || e) };
       }
     }
+    case 'ocrImage': {
+      // From content scripts: recognise and translate the text in one image.
+      if (!validImageUrl(message.url)) return { ok: false, error: 'bad-request' };
+      let result;
+      try {
+        result = await sendToEngine({ type: 'engine.ocrImage', url: message.url });
+      } catch (e) {
+        const noApi = (await getMode()) === 'none';
+        return { ok: false, notReady: true, error: noApi ? 'no-api' : String(e && e.message || e) };
+      }
+      if (result && !result.ok && /^image-|Failed to fetch|decode/i.test(String(result.error)) && message.rect) {
+        try {
+          const captured = await captureImage(message, sender);
+          if (captured && captured.ok) return { ...captured, space: 'css' };
+        } catch (e) { /* keep the original error */ }
+      }
+      return result && result.ok ? { ...result, space: 'image' } : result;
+    }
     case 'recheck': {
       // From popup / welcome page: language pack state may have changed.
       if (message.apiPresent && (await getMode()) === 'none') await setMode('offscreen');
@@ -255,6 +310,7 @@ const HANDLED = new Map([
   ['engine.state', fromEngine],
   ['recheck', fromExtensionPage],
   ['translate', () => true],
+  ['ocrImage', () => true],
 ]);
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -271,7 +327,21 @@ function scheduleKeepalive() {
   chrome.alarms.create(KEEPALIVE_ALARM, { periodInMinutes: 1 });
 }
 
+// Right-click on an image: "Bild übersetzen" translates it at once, whatever its size.
+function createImageMenu() {
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({ id: MENU_IMAGE, title: 'Bild übersetzen', contexts: ['image'] }, () => void chrome.runtime.lastError);
+  });
+}
+
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId !== MENU_IMAGE || !tab || !validImageUrl(info.srcUrl)) return;
+  chrome.tabs.sendMessage(tab.id, { type: 'images.translateNow', srcUrl: info.srcUrl }, { frameId: info.frameId || 0 })
+    .catch(() => {});
+});
+
 chrome.runtime.onInstalled.addListener(async (details) => {
+  createImageMenu();
   // Also fires on Chrome updates: probe the offscreen document again.
   await setMode('offscreen');
   await chrome.storage.local.remove('engineState');

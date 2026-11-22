@@ -13,6 +13,7 @@
   const engineHint = $('engine-hint');
   const composeStatus = $('compose-status');
   const composeBox = $('compose');
+  const imagesBox = $('images');
   let hostname = '';
 
   // ------------------------------------------------------------ language pack
@@ -52,7 +53,7 @@
   chrome.storage.local.get('engineState').then((r) => { lastState = r.engineState; renderApp(lastState); });
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'local' && changes.engineState) { lastState = changes.engineState.newValue; renderApp(lastState); }
-    if (area === 'sync' && (changes.enabled || changes.disabledHosts || changes.compose)) loadSettings();
+    if (area === 'sync' && (changes.enabled || changes.disabledHosts || changes.compose || changes.images)) loadSettings();
   });
   // Wakes the engine if necessary and refreshes its state.
   chrome.runtime.sendMessage({ type: 'recheck', apiPresent: 'Translator' in self }).catch(() => {});
@@ -60,10 +61,12 @@
   // ----------------------------------------------------------------- switches
 
   async function loadSettings() {
-    const settings = await chrome.storage.sync.get(['enabled', 'disabledHosts', 'compose']);
+    const settings = await chrome.storage.sync.get(['enabled', 'disabledHosts', 'compose', 'images']);
     const disabledHosts = Array.isArray(settings.disabledHosts) ? settings.disabledHosts : [];
     enabledBox.checked = settings.enabled !== false;
     composeBox.checked = settings.compose !== false;
+    imagesBox.checked = settings.images !== false;
+    imagesBox.disabled = !enabledBox.checked;
     renderApp(lastState);
     siteBox.checked = !!hostname && disabledHosts.includes(hostname);
     siteBox.disabled = !enabledBox.checked;
@@ -71,6 +74,10 @@
 
   enabledBox.addEventListener('change', () => {
     chrome.storage.sync.set({ enabled: enabledBox.checked });
+  });
+
+  imagesBox.addEventListener('change', () => {
+    chrome.storage.sync.set({ images: imagesBox.checked });
   });
 
   composeBox.addEventListener('change', () => {

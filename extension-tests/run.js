@@ -86,7 +86,7 @@ function startFixtureServer() {
 
 function staticChecks() {
   const m = JSON.parse(fs.readFileSync(path.join(EXT, 'manifest.json'), 'utf8'));
-  ok(m.manifest_version === 3 && m.name === 'Auto Translator' && m.version === '0.1.0', 'manifest basics');
+  ok(m.manifest_version === 3 && m.name === 'Auto Translator' && /^\d+\.\d+\.\d+$/.test(m.version), 'manifest basics');
   const refs = [m.background.service_worker, m.action.default_popup, ...m.content_scripts.flatMap((c) => c.js),
     ...Object.values(m.icons), ...Object.values(m.action.default_icon), 'offscreen.html', 'engine.html', 'welcome.html'];
   for (const f of fs.readdirSync(EXT).filter((f) => f.endsWith('.html'))) {
@@ -185,7 +185,7 @@ async function fakeChecks() {
     }
     if (welcome) {
       const wtxt = await welcome.innerText('body');
-      ok(/Sprachpaket laden/.test(wtxt) && /Desktop-App/.test(wtxt), 'welcome page shows German steps');
+      ok(/Sprachpakete laden/.test(wtxt) && /Auf Chinesisch schreiben/.test(wtxt) && /Desktop-App/.test(wtxt), 'welcome page shows German steps incl. writing helper');
       ok(!/Claude|API-Schlüssel/.test(wtxt), 'welcome page does not mention Claude or API keys');
     }
 
@@ -311,6 +311,87 @@ async function fakeChecks() {
     ok(await until(async () => (await page.textContent('#h')) === '  你好世界  '), 'popup toggle switches page translation off');
     await popup.check('#enabled');
     ok(await until(async () => (await page.textContent('#h')) === '  EN[你好世界]  '), 'popup toggle switches it on again');
+
+    // --- 6b. writing helper: type English, insert Chinese
+    ok(await stateIs((x) => x.writeReady === true), 'compose: engineState writeReady with the fake translator', JSON.stringify(await engineState()));
+    ok(await until(async () => (await popup.textContent('#compose-status')) === 'bereit') && await popup.isChecked('#compose'),
+      'popup: Schreibhilfe bereit, switch on by default', await popup.textContent('#compose-status'));
+    {
+      const cp = await ctx.newPage();
+      await cp.goto(base + 'compose.html');
+      const bar = cp.locator('auto-translator-compose .text');
+      const barText = () => bar.textContent({ timeout: 300 }).catch(() => null);
+      const barShown = async () => (await cp.locator('auto-translator-compose').count()) > 0;
+      const shows = (want) => until(async () => (await barText()) === want, 5000);
+
+      await cp.click('#plain');
+      await cp.keyboard.type('hello');
+      ok(await shows('ZH[hello]'), 'compose: English in a text input shows the Chinese preview', await barText());
+      await cp.click('auto-translator-compose .insert');
+      ok(await until(async () => (await cp.inputValue('#plain')) === 'ZH[hello]'), 'compose: "Einfügen" puts the translation into the field', await cp.inputValue('#plain'));
+      ok(!(await barShown()) && (await cp.evaluate(() => document.activeElement.id)) === 'plain', 'compose: bar closes, focus stays in the field');
+
+      await cp.click('#area');
+      await cp.keyboard.type('good morning');
+      ok(await shows('ZH[good morning]'), 'compose: textarea preview', await barText());
+      await cp.keyboard.press('Control+Shift+Enter');
+      ok(await until(async () => (await cp.inputValue('#area')) === 'ZH[good morning]'), 'compose: Ctrl+Shift+Enter inserts', await cp.inputValue('#area'));
+
+      await cp.click('#editor');
+      await cp.keyboard.type('thanks');
+      ok(await shows('ZH[thanks]'), 'compose: contenteditable preview', await barText());
+      await cp.click('auto-translator-compose .insert');
+      ok(await until(async () => (await cp.textContent('#editor')) === 'ZH[thanks]'), 'compose: contenteditable insert', await cp.textContent('#editor'));
+
+      await cp.click('#react');
+      await cp.keyboard.type('how much');
+      ok(await shows('ZH[how much]'), 'compose: preview for a framework-controlled field');
+      const eventsBefore = await cp.evaluate(() => window.inputEvents);
+      await cp.keyboard.press('Control+Shift+Enter');
+      ok(await until(async () => (await cp.evaluate(() => window.reactState)) === 'ZH[how much]'), 'compose: a controlled field sees the change through input events', await cp.evaluate(() => window.reactState));
+      ok((await cp.evaluate(() => window.inputEvents)) > eventsBefore, 'compose: inserting fires an input event');
+
+      for (const id of ['pass', 'mail', 'card']) {
+        await cp.click('#' + id);
+        await cp.keyboard.type('secret text');
+        await sleep(900);
+        ok(!(await barShown()), 'compose: no helper on #' + id + ' (password / email / card number)');
+      }
+
+      await cp.click('#search');
+      await cp.keyboard.insertText('你好');
+      await sleep(900);
+      ok(!(await barShown()), 'compose: Chinese input shows no helper');
+      await cp.fill('#area', '');
+      await cp.click('#area');
+      await cp.keyboard.type('hi there');
+      ok(await shows('ZH[hi there]'), 'compose: helper appears again for English', await barText());
+      await cp.keyboard.press('Escape');
+      ok(!(await barShown()), 'compose: Escape closes the helper');
+      await cp.keyboard.type(' again');
+      await sleep(900);
+      ok(!(await barShown()) && (await cp.inputValue('#area')) === 'hi there again', 'compose: closed helper stays closed for that field; typing is untouched', await cp.inputValue('#area'));
+
+      await swEval(() => chrome.storage.sync.set({ compose: false }));
+      await cp.fill('#plain', '');
+      await cp.click('#plain');
+      await cp.keyboard.type('bye');
+      await sleep(900);
+      ok(!(await barShown()), 'compose: switch off -> no helper');
+      await swEval(() => chrome.storage.sync.set({ compose: true }));
+      await cp.keyboard.type(' now');
+      ok(await shows('ZH[bye now]'), 'compose: switch on again -> helper back', await barText());
+      ok((await cp.textContent('#h')) === 'EN[联系卖家]', 'compose: page translation still works next to the helper', await cp.textContent('#h'));
+      await cp.close();
+
+      const en = await ctx.newPage();
+      await en.goto(base + 'english.html');
+      await en.click('#plain');
+      await en.keyboard.type('hello');
+      await sleep(900);
+      ok((await en.locator('auto-translator-compose').count()) === 0, 'compose: no helper on pages without Chinese');
+      await en.close();
+    }
 
     ok(app.pageReqs.length === 0, 'v2: no page-translate is ever sent while premium is false', String(app.pageReqs.length));
 
@@ -515,6 +596,7 @@ async function fakeChecks() {
     await swEval(() => chrome.storage.local.set({ debugFakeTranslator: 'missing' }));
     const helloMissing = await nextMsg((m) => m.type === 'hello', 15000);
     ok(helloMissing && helloMissing.ready === false && helloMissing.detail === 'Sprachpaket fehlt', 'pack missing: hello ready:false "Sprachpaket fehlt"', JSON.stringify(helloMissing));
+    ok(await stateIs((x) => x.writeReady === false), 'pack missing: writing helper not ready', JSON.stringify(await engineState()));
     const ms = await stateIs((x) => x.premium && x.pagesReady && x);
     ok(ms && ms.ready === false && ms.pageEngine === 'claude' && ms.availability === 'downloadable', 'pack missing + premium: engineState ready:false, pagesReady:true, pageEngine claude', JSON.stringify(await engineState()));
     const page2 = await ctx.newPage();

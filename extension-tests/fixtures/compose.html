@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><title>联系卖家</title></head>
+<body>
+  <h1 id="h">联系卖家</h1>
+  <p>请输入您的留言</p>
+  <input id="plain" type="text" placeholder="留言">
+  <input id="search" type="search">
+  <textarea id="area"></textarea>
+  <div id="editor" contenteditable="true"></div>
+  <input id="react" type="text">
+  <input id="pass" type="password">
+  <input id="mail" type="email">
+  <input id="card" type="text" autocomplete="cc-number">
+  <script>
+    // "Controlled" field like React: the app state only follows input events.
+    window.reactState = '';
+    window.inputEvents = 0;
+    document.getElementById('react').addEventListener('input', (e) => { window.reactState = e.target.value; });
+    document.addEventListener('input', () => { window.inputEvents++; });
+  </script>
+</body>
+</html>

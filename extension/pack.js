@@ -1,11 +1,16 @@
 // Shared by popup.html and welcome.html: language pack status and download.
 // These are normal extension documents, so a click here is a real user gesture,
-// which Chrome requires for downloading a language pack.
+// which Chrome requires for downloading a language pack. One click downloads every
+// pack the extension uses: Chinese -> English (pages) and English -> Chinese (writing helper).
 
 const LanguagePack = (() => {
   'use strict';
 
-  const PAIR = { sourceLanguage: 'zh', targetLanguage: 'en' };
+  // The first pair is the main one: without it nothing works. The others add features.
+  const PAIRS = [
+    { sourceLanguage: 'zh', targetLanguage: 'en' },
+    { sourceLanguage: 'en', targetLanguage: 'zh' },
+  ];
   let downloading = false;
 
   function apiPresent() {
@@ -15,19 +20,28 @@ const LanguagePack = (() => {
   /** "no-api" | "unavailable" | "downloadable" | "downloading" | "available" */
   async function status() {
     if (!apiPresent()) return 'no-api';
-    try {
-      return await Translator.availability(PAIR);
-    } catch (e) {
-      return 'unavailable';
-    }
+    const states = await Promise.all(PAIRS.map(async (pair) => {
+      try {
+        return await Translator.availability(pair);
+      } catch (e) {
+        return 'unavailable';
+      }
+    }));
+    const main = states[0];
+    if (main === 'unavailable') return main;
+    // A pair this Chrome does not support at all is skipped; otherwise the least ready one counts.
+    const usable = states.filter((s) => s !== 'unavailable');
+    if (usable.includes('downloadable')) return 'downloadable';
+    if (usable.includes('downloading')) return 'downloading';
+    return 'available';
   }
 
   function statusText(state, percent) {
     switch (state) {
       case 'available': return 'bereit';
       case 'downloading':
-        return typeof percent === 'number' ? 'wird geladen ' + percent + ' %' : 'wird geladen …';
-      case 'downloadable': return 'fehlt';
+        return typeof percent === 'number' ? 'werden geladen ' + percent + ' %' : 'werden geladen …';
+      case 'downloadable': return 'fehlen';
       case 'no-api': return 'nicht verfügbar';
       default: return 'wird nicht unterstützt';
     }
@@ -42,17 +56,28 @@ const LanguagePack = (() => {
     if (downloading) return 'downloading';
     downloading = true;
     try {
-      const translator = await Translator.create({
-        ...PAIR,
+      // All create() calls start synchronously, still inside the click's user gesture.
+      // A pack that is already on disk finishes at once.
+      const fractions = PAIRS.map(() => 0);
+      const report = () => {
+        const avg = fractions.reduce((a, b) => a + b, 0) / fractions.length;
+        if (onProgress) onProgress(Math.max(0, Math.min(100, Math.round(avg * 100))));
+      };
+      const jobs = PAIRS.map((pair, i) => Translator.create({
+        ...pair,
         monitor(m) {
           m.addEventListener('downloadprogress', (e) => {
             // e.loaded is a fraction 0..1 (older builds: bytes with e.total).
-            const fraction = e.total && e.total > 1 ? e.loaded / e.total : e.loaded;
-            if (onProgress) onProgress(Math.max(0, Math.min(100, Math.round(fraction * 100))));
+            fractions[i] = e.total && e.total > 1 ? e.loaded / e.total : e.loaded;
+            report();
           });
         },
-      });
-      if (translator && typeof translator.destroy === 'function') translator.destroy();
+      }));
+      const results = await Promise.allSettled(jobs);
+      for (const r of results) {
+        if (r.status === 'fulfilled' && r.value && typeof r.value.destroy === 'function') r.value.destroy();
+      }
+      if (results[0].status === 'rejected') throw results[0].reason;
     } finally {
       downloading = false;
       // Tell the engine document to look again.
@@ -74,7 +99,7 @@ const LanguagePack = (() => {
       const showButton = state === 'downloadable' || state === 'downloading';
       elements.button.hidden = !showButton;
       elements.button.disabled = state === 'downloading';
-      elements.button.textContent = state === 'downloading' ? 'Sprachpaket wird geladen …' : 'Sprachpaket laden';
+      elements.button.textContent = state === 'downloading' ? 'Sprachpakete werden geladen …' : 'Sprachpakete laden';
       if (elements.hint) {
         elements.hint.hidden = state !== 'no-api' && state !== 'unavailable';
         elements.hint.textContent = state === 'no-api'
@@ -101,7 +126,7 @@ const LanguagePack = (() => {
           percent = undefined;
           if (elements.error) {
             elements.error.hidden = false;
-            elements.error.textContent = 'Das Sprachpaket konnte nicht geladen werden. Bitte Internetverbindung prüfen und erneut versuchen.';
+            elements.error.textContent = 'Die Sprachpakete konnten nicht geladen werden. Bitte Internetverbindung prüfen und erneut versuchen.';
           }
           refresh();
         },

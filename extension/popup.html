@@ -13,7 +13,7 @@
 
   <section class="status" aria-live="polite">
     <div class="row">
-      <span class="label">Sprachpaket</span>
+      <span class="label">Sprachpakete</span>
       <span class="value" id="pack-status" data-state="">…</span>
     </div>
     <div class="row">
@@ -24,9 +24,13 @@
       <span class="label">Webseiten</span>
       <span class="value" id="page-engine" data-state="">…</span>
     </div>
+    <div class="row">
+      <span class="label">Schreibhilfe</span>
+      <span class="value" id="compose-status" data-state="">…</span>
+    </div>
   </section>
 
-  <button id="download" class="primary" hidden>Sprachpaket laden</button>
+  <button id="download" class="primary" hidden>Sprachpakete laden</button>
   <p id="download-error" class="hint error" hidden></p>
   <p id="api-hint" class="hint error" hidden></p>
 
@@ -38,6 +42,10 @@
     <label class="toggle" id="site-row" hidden>
       <input type="checkbox" id="site-off">
       <span>Auf dieser Seite deaktivieren<small id="site-name"></small></span>
+    </label>
+    <label class="toggle">
+      <input type="checkbox" id="compose">
+      <span>Schreibhilfe in Eingabefeldern<small>Englisch tippen, Chinesisch einfügen</small></span>
     </label>
   </section>
 

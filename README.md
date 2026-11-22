@@ -34,6 +34,7 @@ No account, no API key, no subscription, and no screen text is ever uploaded.
 - [Why offline matters](#why-offline-matters)
 - [What you get](#what-you-get)
 - [Which part should I use?](#which-part-should-i-use)
+- [Writing in Chinese](#writing-in-chinese)
 - [Requirements](#requirements)
 - [Installation tutorial](#installation-tutorial)
 - [Everyday use](#everyday-use)
@@ -52,13 +53,13 @@ Online translators send all of that to a server. AutoTranslator does not.
 | Part | Where it runs | Uses the internet? |
 |---|---|---|
 | Reading text on screen (OCR) | Windows' built-in text recognition | **No** |
-| Translating Chinese → English | Chrome's built-in on-device translator | **No**, after a one-time language pack download |
+| Translating Chinese ↔ English | Chrome's built-in on-device translator | **No**, after a one-time language pack download |
 | App ↔ Chrome extension | WebSocket on `127.0.0.1` (your own PC) | **No**, only accepts the Chrome extension |
 | Settings and translation cache | Files in `%AppData%\AutoTranslator` | **No** |
 | Telemetry, accounts, API keys | none | — |
 
-The only download is the Chinese → English language pack, which Chrome fetches once from Google when you
-click **"Sprachpaket laden"**. After that you can unplug the network cable and translation keeps working.
+The only download is the language packs (Chinese → English, and English → Chinese for the writing
+helper), which Chrome fetches once from Google when you click **"Sprachpakete laden"**. After that you can unplug the network cable and translation keeps working.
 
 ## What you get
 
@@ -67,13 +68,16 @@ click **"Sprachpaket laden"**. After that you can unplug the network cable and t
 - **Websites:** the Chrome extension replaces Chinese text on the page itself, including text loaded later
   (infinite scroll, pop-ups, chats), iframes, drop-down menus and image captions. Input fields and passwords
   are never touched.
+- **Writing in Chinese:** type English into a text field on a Chinese page and the Chinese translation
+  appears right below it; one click inserts it. See [Writing in Chinese](#writing-in-chinese).
 - **Windows programs:** the desktop app reads the active window and draws the English text on a transparent
   layer over the original. Clicks go straight through to the program underneath.
 - **Fast:** in tests, new text was translated and shown about 0.5 s after it appeared.
 - **Light:** a small tray icon next to the clock; when the screen does not change, it does almost nothing.
 - **Free** and open source.
 
-> The user interface of the app and the extension is in German. Translation direction is Chinese → English.
+> The user interface of the app and the extension is in German. Pages are translated Chinese → English;
+> the writing helper translates English → Chinese.
 
 ## Which part should I use?
 
@@ -125,8 +129,9 @@ including the offline translation.
 1. In Chrome, type `chrome://extensions` into the address bar and press Enter.
 2. Turn on **Developer mode** (switch in the top right corner).
 3. Click **Load unpacked** and select the `extension` folder.
-4. A welcome page opens. Click **"Sprachpaket laden"** (download language pack) and wait until the status
-   says **"bereit"** (ready). This is the only time anything is downloaded.
+4. A welcome page opens. Click **"Sprachpakete laden"** (download language packs) and wait until the status
+   says **"bereit"** (ready). One click downloads both packs: Chinese → English for pages and
+   English → Chinese for the writing helper. This is the only time anything is downloaded.
 
 Websites in Chrome are now translated automatically. Tabs that were already open need one reload.
 
@@ -159,6 +164,20 @@ Windows needs its Chinese OCR component to read Chinese characters on screen. Ch
 > **Tip:** to start AutoTranslator with Windows, press `Win + R`, type `shell:startup`, press Enter and put a
 > shortcut to `AutoTranslator.exe` into that folder.
 
+## Writing in Chinese
+
+Need to message a seller, search a Chinese shop or fill in a form? Just type in English.
+
+1. Click into a text field on a page with Chinese text (chat box, search, comment, message …).
+2. Type in English. After a short pause a dark bar below the field shows the Chinese translation.
+3. Click **Einfügen** (insert) or press **Ctrl + Shift + Enter**: the Chinese text replaces what you typed.
+   **Esc** or **×** closes the bar for that field.
+
+The helper stays out of the way: it only appears on pages with Chinese text, only for English input, and
+never on password, e-mail, phone, number or card-number fields. What you type is translated on your PC,
+is not stored, and is only written into the field when you click *Einfügen*. Turn it off in the
+extension popup (*Schreibhilfe in Eingabefeldern*).
+
 ## Everyday use
 
 | Action | How |
@@ -167,6 +186,7 @@ Windows needs its Chinese OCR component to read Chinese characters on screen. Ch
 | Choose how text is read | Tray menu → *Texterkennung*: **OCR** (reads everything visible, default), **UI-Automation** (reads text straight from the program, very exact but not supported everywhere), or **Beides** (both) |
 | Choose what is read | Tray menu → *Bereich*: **Aktives Fenster** (active window, faster) or **Ganzer Hauptbildschirm** (whole primary screen) |
 | Translate paragraphs as a whole | Tray menu → *Zeilen zu Absätzen zusammenfassen* (on by default; turn off for lists with many short entries) |
+| Write Chinese in a text field | Type English, then **Einfügen** or **Ctrl + Shift + Enter** (see [Writing in Chinese](#writing-in-chinese)) |
 | Pause websites in Chrome | Click the extension icon → untick *Webseiten automatisch übersetzen*, or disable it for one site only |
 | See status and setup help | Tray menu → *Einrichtung / Hilfe…* (or double-click the tray icon) |
 | Quit | Tray menu → *Beenden* |
@@ -178,7 +198,8 @@ Chrome has to be open while you translate, because the app uses Chrome's transla
 | Problem | Fix |
 |---|---|
 | Status says **"Chrome-Erweiterung nicht verbunden"** | Open Chrome and check that the extension is enabled on `chrome://extensions`. |
-| Extension popup says **"Sprachpaket fehlt"** | Click **"Sprachpaket laden"** in the popup and wait until it says *bereit*. |
+| Extension popup says **"Sprachpakete fehlen"** | Click **"Sprachpakete laden"** in the popup and wait until it says *bereit*. |
+| The writing helper says a language pack is missing | Same fix: **"Sprachpakete laden"** in the popup. |
 | Help window says the **Chinese OCR is missing** | Do step 3, then quit and restart AutoTranslator. |
 | **"AutoTranslator läuft bereits"** | The app is already running; look for the icon next to the clock. |
 | Small text is not translated | Very small fonts (about 12 px) are hard to read for OCR. Zoom in (Ctrl + Plus) or try *UI-Automation*. |

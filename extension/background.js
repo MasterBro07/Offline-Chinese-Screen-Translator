@@ -153,7 +153,9 @@ const ENGINE_URLS = [chrome.runtime.getURL(OFFSCREEN_PATH), ENGINE_TAB_URL];
 const DEBUG_FAKE_VALUES = new Set(['all', 'tab', 'offscreen', 'none', 'missing']);
 const MAX_REQUEST_TEXTS = 200;
 const MAX_REQUEST_CHARS = 100000;
-const LANGUAGE = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8}){0,2}$/;
+// Language pairs content scripts may ask for: page text (Chinese -> English) and the
+// writing helper (English -> Chinese).
+const ALLOWED_PAIRS = new Set(['zh>en', 'zh-Hant>en', 'en>zh']);
 
 function fromExtensionPage(sender) {
   return typeof sender.url === 'string' && sender.url.startsWith(EXTENSION_BASE);
@@ -186,6 +188,7 @@ function sanitizeEngineState(state) {
     usePremium: s.usePremium !== false,
     pagesReady: s.pagesReady === true,
     pageEngine: text(s.pageEngine, 'chrome'),
+    writeReady: s.writeReady === true,
   };
 }
 
@@ -214,13 +217,16 @@ async function handleMessage(message, sender) {
       await chrome.storage.local.set({ engineState: sanitizeEngineState(message.state) });
       return { ok: true };
     case 'translate': {
-      // From content scripts. Languages are fixed for now (zh -> en).
+      // From content scripts: page text (zh -> en) or the writing helper (en -> zh).
       if (!validTexts(message.texts)) return { ok: false, error: 'bad-request' };
+      const source = message.source === undefined ? 'zh' : message.source;
+      const target = message.target === undefined ? 'en' : message.target;
+      if (!ALLOWED_PAIRS.has(source + '>' + target)) return { ok: false, error: 'bad-request' };
       try {
         return await sendToEngine({
           type: 'engine.translate',
-          sourceLanguage: LANGUAGE.test(message.source) ? message.source : 'zh',
-          targetLanguage: LANGUAGE.test(message.target) ? message.target : 'en',
+          sourceLanguage: source,
+          targetLanguage: target,
           texts: message.texts,
         });
       } catch (e) {

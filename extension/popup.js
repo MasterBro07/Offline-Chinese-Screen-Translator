@@ -11,6 +11,8 @@
   const siteName = $('site-name');
   const pageEngine = $('page-engine');
   const engineHint = $('engine-hint');
+  const composeStatus = $('compose-status');
+  const composeBox = $('compose');
   let hostname = '';
 
   // ------------------------------------------------------------ language pack
@@ -37,12 +39,20 @@
     engineHint.textContent = viaApp
       ? 'Chinesisch → Englisch über die Desktop-App. Fällt sie aus, übersetzt Chrome direkt auf diesem Gerät.'
       : 'Chinesisch → Englisch, kostenlos und direkt auf diesem Gerät.';
+
+    // Writing helper (English -> Chinese).
+    const writeReady = !!(state && state.writeReady);
+    const composeOn = composeBox.checked;
+    composeStatus.textContent = !composeOn ? 'aus' : writeReady ? 'bereit' : 'Sprachpaket fehlt';
+    composeStatus.dataset.state = !composeOn ? 'off' : writeReady ? 'available' : 'downloadable';
   }
 
-  chrome.storage.local.get('engineState').then((r) => renderApp(r.engineState));
+  let lastState = null;
+
+  chrome.storage.local.get('engineState').then((r) => { lastState = r.engineState; renderApp(lastState); });
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'local' && changes.engineState) renderApp(changes.engineState.newValue);
-    if (area === 'sync' && (changes.enabled || changes.disabledHosts)) loadSettings();
+    if (area === 'local' && changes.engineState) { lastState = changes.engineState.newValue; renderApp(lastState); }
+    if (area === 'sync' && (changes.enabled || changes.disabledHosts || changes.compose)) loadSettings();
   });
   // Wakes the engine if necessary and refreshes its state.
   chrome.runtime.sendMessage({ type: 'recheck', apiPresent: 'Translator' in self }).catch(() => {});
@@ -50,15 +60,22 @@
   // ----------------------------------------------------------------- switches
 
   async function loadSettings() {
-    const settings = await chrome.storage.sync.get(['enabled', 'disabledHosts']);
+    const settings = await chrome.storage.sync.get(['enabled', 'disabledHosts', 'compose']);
     const disabledHosts = Array.isArray(settings.disabledHosts) ? settings.disabledHosts : [];
     enabledBox.checked = settings.enabled !== false;
+    composeBox.checked = settings.compose !== false;
+    renderApp(lastState);
     siteBox.checked = !!hostname && disabledHosts.includes(hostname);
     siteBox.disabled = !enabledBox.checked;
   }
 
   enabledBox.addEventListener('change', () => {
     chrome.storage.sync.set({ enabled: enabledBox.checked });
+  });
+
+  composeBox.addEventListener('change', () => {
+    chrome.storage.sync.set({ compose: composeBox.checked });
+    renderApp(lastState);
   });
 
   siteBox.addEventListener('change', async () => {

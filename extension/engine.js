@@ -22,6 +22,7 @@
   const POLL_READY_MS = 60000;
   const CACHE_CAPACITY = 5000;
   const READY_PAIR = { source: 'zh', target: 'en' };
+  const WRITE_PAIR = { source: 'en', target: 'zh' }; // writing helper: English in, Chinese out
   const PAGE_TIMEOUT_MS = 10000; // the app must answer a page batch within this time
   const PREMIUM_COOLDOWN_MS = 30000; // after a timeout the app is not asked for a while
   const ON_DEVICE = 'chrome'; // engine tag of the on-device translator
@@ -29,6 +30,7 @@
   let translatorApi = null; // the global Translator (or the test fake)
   let availability = 'unavailable';
   let ready = false;
+  let writeReady = false; // en -> zh language pack present (writing helper)
   let bridgeConnected = false;
   let socket = null;
   let bridgePort = 47613;
@@ -56,13 +58,15 @@
   /** Fake backend for automated tests. */
   function createFakeTranslatorApi(packMissing) {
     // Like the real API, the fake only knows real language codes.
-    const known = (o) => !!o && /^zh(-Hant)?$/.test(o.sourceLanguage) && o.targetLanguage === 'en';
+    const known = (o) => !!o && ((/^zh(-Hant)?$/.test(o.sourceLanguage) && o.targetLanguage === 'en')
+      || (o.sourceLanguage === 'en' && o.targetLanguage === 'zh'));
     return {
       availability: async (o) => (!known(o) ? 'unavailable' : packMissing ? 'downloadable' : 'available'),
       create: async (o) => {
         if (packMissing || !known(o)) throw new Error('language pack missing');
+        const tag = o.targetLanguage === 'zh' ? 'ZH' : 'EN';
         return {
-          translate: async (text) => 'EN[' + text + ']',
+          translate: async (text) => tag + '[' + text + ']',
           destroy() {},
         };
       },
@@ -279,7 +283,9 @@
   /** Page batches: premium engine while offered; on-device otherwise or on failure. */
   async function translateForPages(texts, source, target) {
     if (!Array.isArray(texts)) throw new Error('texts must be an array');
-    if (premiumActive()) {
+    // Only Chinese page text goes to the app; the writing helper (en -> zh) always stays on-device.
+    const fromChinese = /^zh/i.test(String(source || 'zh')) && String(target || 'en').toLowerCase() === 'en';
+    if (fromChinese && premiumActive()) {
       try {
         return await translateViaApp(texts, source || 'zh', target || 'en');
       } catch (e) {
@@ -313,6 +319,7 @@
    *   usePremium   user setting
    *   pagesReady   pages can be translated right now (on-device OR via the app)
    *   pageEngine   engine for new page text: "chrome" or the app's engine name
+   *   writeReady   writing helper usable (en -> zh language pack present)
    */
   function currentState() {
     const viaApp = premiumActive();
@@ -326,6 +333,7 @@
       usePremium,
       pagesReady: ready || viaApp,
       pageEngine: viaApp ? appEngine : ON_DEVICE,
+      writeReady,
     };
   }
 
@@ -336,9 +344,14 @@
 
   async function recheck() {
     if (!translatorApi || stopped) return;
-    const next = await queryAvailability(READY_PAIR.source, READY_PAIR.target);
+    const [next, nextWrite] = await Promise.all([
+      queryAvailability(READY_PAIR.source, READY_PAIR.target),
+      queryAvailability(WRITE_PAIR.source, WRITE_PAIR.target),
+    ]);
     const nextReady = next === 'available';
-    const changed = next !== availability || nextReady !== ready;
+    const nextWriteReady = nextWrite === 'available';
+    const changed = next !== availability || nextReady !== ready || nextWriteReady !== writeReady;
+    writeReady = nextWriteReady;
     const readyChanged = nextReady !== ready;
     availability = next;
     ready = nextReady;
@@ -350,7 +363,7 @@
   function schedulePoll() {
     clearTimeout(pollTimer);
     if (stopped) return;
-    pollTimer = setTimeout(recheck, ready ? POLL_READY_MS : POLL_NOT_READY_MS);
+    pollTimer = setTimeout(recheck, ready && writeReady ? POLL_READY_MS : POLL_NOT_READY_MS);
   }
 
   // ------------------------------------------------------------ bridge client

@@ -309,6 +309,8 @@
     }
     if (!value || value.length > MAX_TEXT_CHARS || !HAN.test(value)) { pendingText.delete(node); return; }
     if (closestDeep(node.parentNode, TEXT_SKIP)) return;
+    // Shared with compose.js (same isolated world): this frame shows Chinese text.
+    globalThis.__autoTranslatorSawChinese = true;
     const known = lookup(splitWhitespace(value).core, hotScan || isHot(node));
     if (known !== undefined) { pendingText.delete(node); applyText(node, known); }
     else pendingText.add(node);

@@ -74,7 +74,8 @@ auch die Offline-Übersetzung.
 2. Oben rechts den **Entwicklermodus** einschalten.
 3. Auf **„Entpackte Erweiterung laden“** klicken und den entpackten Ordner der Erweiterung auswählen.
 4. Auf das Symbol der Erweiterung klicken (eventuell zuerst auf das Puzzle-Symbol) und im kleinen Fenster
-   **„Sprachpaket laden“** anklicken. Warten, bis es fertig ist. Das ist nur einmal nötig.
+   **„Sprachpakete laden“** anklicken. Warten, bis es fertig ist. Ein Klick lädt beide Pakete:
+   Chinesisch → Englisch für Webseiten und Englisch → Chinesisch für die Schreibhilfe. Das ist nur einmal nötig.
 
 Der Ordner darf danach nicht gelöscht oder verschoben werden.
 
@@ -102,6 +103,21 @@ Add-WindowsCapability -Online -Name "Language.OCR~~~zh-CN~0.0.1.0"
 2. Beim ersten Start öffnet sich ein Fenster mit der Einrichtungshilfe. Dort steht auch, ob Chrome-Erweiterung
    und Texterkennung schon bereit sind.
 3. Das Programm läuft danach als rundes Symbol im Infobereich neben der Uhr (eventuell hinter dem Pfeil „^“).
+
+## Auf Chinesisch schreiben
+
+Eine Nachricht an den Verkäufer, eine Suche im chinesischen Shop, ein Formular? Einfach auf Englisch tippen.
+
+1. In ein Textfeld auf einer Seite mit chinesischem Text klicken (Chat, Suche, Kommentar, Nachricht …).
+2. Auf Englisch tippen. Nach einer kurzen Pause zeigt eine dunkle Leiste unter dem Feld die chinesische
+   Übersetzung.
+3. Auf **Einfügen** klicken oder **Strg+Umschalt+Enter** drücken: Der chinesische Text ersetzt das Getippte.
+   **Esc** oder **×** blendet die Leiste für dieses Feld aus.
+
+Die Schreibhilfe drängt sich nicht auf: Sie erscheint nur auf Seiten mit chinesischem Text, nur bei englischer
+Eingabe und nie bei Passwort-, E-Mail-, Telefon-, Zahlen- oder Kartennummer-Feldern. Das Getippte wird auf dem
+eigenen PC übersetzt, nicht gespeichert und nur nach „Einfügen“ ins Feld geschrieben. Abschalten lässt sie sich
+im Popup der Erweiterung (*Schreibhilfe in Eingabefeldern*).
 
 ## Bedienung
 

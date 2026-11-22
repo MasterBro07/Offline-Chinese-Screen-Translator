@@ -151,6 +151,13 @@ im Popup der Erweiterung (*Schreibhilfe in Eingabefeldern*).
 - Die Statuszeile im Menü zeigt, ob gerade etwas fehlt (z. B. „Warte auf Chrome-Erweiterung“). Näheres steht
   unter „Einrichtung / Hilfe…“.
 
+## Wenn etwas nicht klappt
+
+- **Nach einem Update oder Neuinstallieren der Erweiterung wird nichts übersetzt:** offene Tabs einmal neu laden
+  (**F5**). Chrome setzt die neue Version nur in Seiten ein, die nach dem Update geöffnet werden.
+- **Im Popup steht „Sprachpakete fehlen“:** im Popup auf **„Sprachpakete laden“** klicken und warten, bis
+  *bereit* dasteht.
+
 ## Bekannte Grenzen
 
 - **Chrome muss laufen.** Ohne geöffnetes Chrome mit der Erweiterung gibt es keine Übersetzung.

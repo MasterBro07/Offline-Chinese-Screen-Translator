@@ -219,6 +219,7 @@ Chrome has to be open while you translate, because the app uses Chrome's transla
 | Problem | Fix |
 |---|---|
 | Status says **"Chrome-Erweiterung nicht verbunden"** | Open Chrome and check that the extension is enabled on `chrome://extensions`. |
+| Nothing is translated after updating or reinstalling the extension | Reload the open tabs once (**F5**). Chrome only adds the new version to pages opened after the update. |
 | Extension popup says **"Sprachpakete fehlen"** | Click **"Sprachpakete laden"** in the popup and wait until it says *bereit*. |
 | The writing helper says a language pack is missing | Same fix: **"Sprachpakete laden"** in the popup. |
 | Help window says the **Chinese OCR is missing** | Do step 3, then quit and restart AutoTranslator. |

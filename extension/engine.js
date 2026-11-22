@@ -18,12 +18,18 @@
   const CACHE_CAPACITY = 5000;
   const READY_PAIR = { source: 'zh', target: 'en' };
   const WRITE_PAIR = { source: 'en', target: 'zh' }; // writing helper: English in, Chinese out
+  const HANT_PAIR = { source: 'zh-Hant', target: 'en' }; // traditional Chinese (Taiwan, Hong Kong)
+  // Frequent characters that differ between traditional and simplified Chinese. Chrome has separate
+  // models for the two, so each text goes to the one it is written in.
+  const TRADITIONAL_ONLY = new Set('這們個來會為說時過對開關頁選擇價錢號區間營業師預約髮燙數歡點實習設計與動產買賣運費貨購員體現發國東車長門問題應該還讓種從頭話學經樣機電腦視聽讀寫書語網圖鐘衛張單雙優灣廣場線總紅綠藍黃碼顏裝褲襪帶環夠緊輕適簡熱銷禮專認證務結帳訂憑據標際達隨處條鐵銀錄續紹統絡傳輸資訊載檔請謝嗎麼誰鄉縣鎮莊園庫廳館醫藥療幫歲萬億兩雜漢華陽陰風氣鳥魚馬龍鳳劃劍戰爭勝敗舊齊雖確夾');
+  const SIMPLIFIED_ONLY = new Set('这们个来会为说时过对开关页选择价钱号区间营业师预约发烫数欢点实习设计与动产买卖运费货购员体现国东车长门问题应该还让种从头话学经样机电脑视听读写书语网图钟卫张单双优湾广场线总红绿蓝黄码颜装裤袜带环够紧轻适简热销礼专认证务结账订凭据标际达随处条铁银录续绍统络传输资讯载档请谢吗么谁乡县镇庄园库厅馆医药疗帮岁万亿两杂汉华阳阴风气鸟鱼马龙凤划剑战争胜败旧齐虽确夹');
   const ON_DEVICE = 'chrome'; // engine tag of the on-device translator
 
   let translatorApi = null; // the global Translator (or the test fake)
   let availability = 'unavailable';
   let ready = false;
   let writeReady = false; // en -> zh language pack present (writing helper)
+  let hantReady = false; // zh-Hant -> en language pack present (traditional Chinese)
   let pollTimer = null;
   let stopped = false;
 
@@ -45,7 +51,7 @@
       availability: async (o) => (!known(o) ? 'unavailable' : packMissing ? 'downloadable' : 'available'),
       create: async (o) => {
         if (packMissing || !known(o)) throw new Error('language pack missing');
-        const tag = o.targetLanguage === 'zh' ? 'ZH' : 'EN';
+        const tag = o.targetLanguage === 'zh' ? 'ZH' : o.sourceLanguage === 'zh-Hant' ? 'TW' : 'EN';
         // A few real words, so tests can check spacing between translated inline pieces.
         const words = o.targetLanguage === 'en' ? { 免费: 'Free', 送货: 'shipping', 包邮: 'Free', 退货: 'returns' } : {};
         return {
@@ -145,9 +151,22 @@
     return lead + translated + trail;
   }
 
+  /** True when a text is written in traditional characters. */
+  function isTraditional(text) {
+    let trad = 0;
+    let simp = 0;
+    for (const ch of text) {
+      if (TRADITIONAL_ONLY.has(ch)) trad++;
+      else if (SIMPLIFIED_ONLY.has(ch)) simp++;
+    }
+    return trad > simp;
+  }
+
   async function translateText(text, source, target) {
     if (typeof text !== 'string') text = text == null ? '' : String(text);
     if (!text.trim()) return text;
+    // Chinese pages: traditional text goes to the zh-Hant model when its pack is there.
+    if (source === 'zh' && target === 'en' && hantReady && isTraditional(text)) source = 'zh-Hant';
     if (!text.includes('\n')) return translateLine(text, source, target);
     const lines = text.split('\n');
     for (let i = 0; i < lines.length; i++) lines[i] = await translateLine(lines[i], source, target);
@@ -250,6 +269,7 @@
    *   pagesReady   pages can be translated right now (same as ready)
    *   pageEngine   always "chrome" (the on-device translator)
    *   writeReady   writing helper usable (en -> zh language pack present)
+   *   hantReady    traditional Chinese model present (zh-Hant -> en)
    *   detail       short German explanation when not ready
    */
   function currentState() {
@@ -261,6 +281,7 @@
       pagesReady: ready,
       pageEngine: ON_DEVICE,
       writeReady,
+      hantReady,
       detail: translatorApi ? detailFor(availability) : detailFor('no-api'),
     };
   }
@@ -272,14 +293,18 @@
 
   async function recheck() {
     if (!translatorApi || stopped) return;
-    const [next, nextWrite] = await Promise.all([
+    const [next, nextWrite, nextHant] = await Promise.all([
       queryAvailability(READY_PAIR.source, READY_PAIR.target),
       queryAvailability(WRITE_PAIR.source, WRITE_PAIR.target),
+      queryAvailability(HANT_PAIR.source, HANT_PAIR.target),
     ]);
     const nextReady = next === 'available';
     const nextWriteReady = nextWrite === 'available';
-    const changed = next !== availability || nextReady !== ready || nextWriteReady !== writeReady;
+    const nextHantReady = nextHant === 'available';
+    const changed = next !== availability || nextReady !== ready || nextWriteReady !== writeReady
+      || nextHantReady !== hantReady;
     writeReady = nextWriteReady;
+    hantReady = nextHantReady;
     availability = next;
     ready = nextReady;
     if (changed) pushState();
@@ -289,7 +314,7 @@
   function schedulePoll() {
     clearTimeout(pollTimer);
     if (stopped) return;
-    pollTimer = setTimeout(recheck, ready && writeReady ? POLL_READY_MS : POLL_NOT_READY_MS);
+    pollTimer = setTimeout(recheck, ready && writeReady && hantReady ? POLL_READY_MS : POLL_NOT_READY_MS);
   }
 
   // --------------------------------------------- messages from service worker

@@ -55,8 +55,8 @@ Online translators send all of that to a server. Auto Translator does not.
 | Settings and caches | Inside Chrome on your PC | **No** |
 | Telemetry, accounts, API keys | none | — |
 
-The only download is the language packs (Chinese → English, and English → Chinese for the writing
-helper), which Chrome fetches once from Google when you click **"Sprachpakete laden"**. After that you can
+The only download is the language packs (simplified and traditional Chinese → English, and English →
+Chinese for the writing helper), which Chrome fetches once from Google when you click **"Sprachpakete laden"**. After that you can
 unplug the network cable and translation keeps working.
 
 ## What you get
@@ -69,7 +69,8 @@ unplug the network cable and translation keeps working.
   translated automatically; the English is drawn right over it. See [Text in images](#text-in-images).
 - **Writing in Chinese:** type English into a text field on a Chinese page and the Chinese translation
   appears right below it; one click inserts it. See [Writing in Chinese](#writing-in-chinese).
-- **Simplified and traditional Chinese** (mainland, Taiwan, Hong Kong shops).
+- **Simplified and traditional Chinese** (mainland, Taiwan, Hong Kong): each text goes to the matching
+  model of Chrome's translator.
 - **Free** and open source.
 
 > The extension's interface is in German. Pages are translated Chinese → English; the writing helper
@@ -129,8 +130,8 @@ extension popup (*Schreibhilfe in Eingabefeldern*).
 2. Turn on **Developer mode** (switch in the top right corner).
 3. Click **Load unpacked** and select the unzipped folder.
 4. A welcome page opens. Click **"Sprachpakete laden"** (download language packs) and wait until the status
-   says **"bereit"** (ready). One click downloads both packs: Chinese → English for pages and
-   English → Chinese for the writing helper. This is the only time anything is downloaded.
+   says **"bereit"** (ready). One click downloads all packs: simplified and traditional Chinese → English
+   for pages and English → Chinese for the writing helper. This is the only time anything is downloaded.
 
 **Done.** Chinese websites are now translated automatically. Tabs that were already open need one reload.
 
@@ -153,6 +154,7 @@ extension popup (*Schreibhilfe in Eingabefeldern*).
 | Nothing is translated after updating or reinstalling the extension | Reload the open tabs once (**F5**). Chrome only adds the new version to pages opened after the update. |
 | Extension popup says **"Sprachpakete fehlen"** | Click **"Sprachpakete laden"** in the popup and wait until it says *bereit*. |
 | The writing helper says a language pack is missing | Same fix: **"Sprachpakete laden"** in the popup. |
+| Traditional Chinese pages (Taiwan, Hong Kong) stay Chinese after an update | The traditional pack is new: click **"Sprachpakete laden"** in the popup once. |
 | The popup says the translator is not available | Update Chrome (version 138 or newer is needed) and use it on a desktop computer. |
 | An image is not translated | Very small images are skipped; right-click → **Bild übersetzen**. Text in decorative fonts may not be recognised. |
 

@@ -237,6 +237,7 @@ function sanitizeEngineState(state) {
     pagesReady: s.pagesReady === true,
     pageEngine: text(s.pageEngine, 'chrome'),
     writeReady: s.writeReady === true,
+    hantReady: s.hantReady === true,
     detail: typeof s.detail === 'string' && s.detail.length <= 120 ? s.detail : '',
   };
 }

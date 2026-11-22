@@ -10,7 +10,6 @@ const LanguagePack = (() => {
   const PAIRS = [
     { sourceLanguage: 'zh', targetLanguage: 'en' },
     { sourceLanguage: 'en', targetLanguage: 'zh' },
-    { sourceLanguage: 'zh-Hant', targetLanguage: 'en' },
   ];
   let downloading = false;
 

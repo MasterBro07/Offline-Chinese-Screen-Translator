@@ -264,21 +264,21 @@ async function fakeChecks() {
     await popup.check('#enabled');
     ok(await until(async () => (await page.textContent('#h')) === '  EN[你好世界]  '), 'popup toggle switches it on again');
 
-    // --- 6a. traditional Chinese (Taiwan, Hong Kong) goes to the zh-Hant model
-    ok(await stateIs((x) => x.hantReady === true), 'traditional: engineState hantReady with the fake translator', JSON.stringify(await engineState()));
+    // --- 6a. traditional Chinese (Taiwan, Hong Kong): converted to simplified, then translated
     {
       const tp = await ctx.newPage();
       await tp.goto(base + 'traditional.html');
       const t = (id) => tp.textContent('#' + id);
-      ok(await until(async () => (await t('t2')) === 'TW[營業時間：11:00 ~ 21:00]', 8000), 'traditional: traditional text uses the zh-Hant model', await t('t2'));
-      ok((await t('t1')) === 'TW[【 台中西區男士髮型首選 】]' && (await t('t3')).startsWith('TW[初次蒞臨'), 'traditional: all traditional lines', await t('t1') + ' | ' + await t('t3'));
-      ok((await t('s1')) === 'EN[营业时间：每天开放]', 'traditional: simplified text on the same page uses the zh model', await t('s1'));
-      ok((await t('n1')) === 'EN[台中]', 'traditional: text without telling characters uses the zh model', await t('n1'));
-      ok((await tp.title()) === 'TW[線上預約]', 'traditional: page title too', await tp.title());
+      ok(await until(async () => (await t('t2')) === 'EN[营业时间：11:00 ~ 21:00]', 8000), 'traditional: converted to simplified before translating', await t('t2'));
+      ok((await t('t1')) === 'EN[【 台中西区男士发型首选 】]' && (await t('t3')).startsWith('EN[初次莅临或是没有特别指定设计师'), 'traditional: all traditional lines', await t('t1') + ' | ' + await t('t3'));
+      ok((await t('s1')) === 'EN[营业时间：每天开放]', 'traditional: simplified text on the same page is left as it is', await t('s1'));
+      ok((await t('n1')) === 'EN[台中]', 'traditional: text without telling characters unchanged', await t('n1'));
+      ok((await tp.title()) === 'EN[线上预约]', 'traditional: page title too', await tp.title());
+      ok((await t('t2')) !== '營業時間：11:00 ~ 21:00', 'traditional: works without any extra language pack');
       await tp.close();
     }
     const directHant = await popup.evaluate(() => chrome.runtime.sendMessage({ type: 'translate', source: 'zh', target: 'en', texts: ['這個', '这个'] }));
-    ok(directHant && directHant.ok && directHant.translations.join('|') === 'TW[這個]|EN[这个]', 'traditional: decided per text inside one batch', JSON.stringify(directHant));
+    ok(directHant && directHant.ok && directHant.translations.join('|') === 'EN[这个]|EN[这个]', 'traditional: decided per text inside one batch', JSON.stringify(directHant));
 
     // --- 6b. writing helper: type English, insert Chinese
     ok(await stateIs((x) => x.writeReady === true), 'compose: engineState writeReady with the fake translator', JSON.stringify(await engineState()));

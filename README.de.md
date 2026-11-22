@@ -27,8 +27,9 @@ Ein Ablaufdiagramm steht in [docs/workflow.svg](docs/workflow.svg).
   Original. Eingabefelder und Passwörter werden nie angefasst.
 - **Text in Bildern** wird erkannt und übersetzt (siehe unten).
 - **Schreibhilfe:** Englisch tippen, Chinesisch einfügen (siehe unten).
-- **Vereinfachtes und traditionelles Chinesisch** (Festland, Taiwan, Hongkong): Jeder Text geht an das
-  passende Modell von Chromes Übersetzer.
+- **Vereinfachtes und traditionelles Chinesisch** (Festland, Taiwan, Hongkong): Traditionelle Texte werden
+  auf dem eigenen PC in vereinfachte Zeichen umgewandelt (OpenCC-Tabelle) und dann übersetzt; dafür ist kein
+  zusätzliches Paket nötig.
 
 ## Voraussetzungen
 
@@ -51,8 +52,8 @@ Ein Ablaufdiagramm steht in [docs/workflow.svg](docs/workflow.svg).
 2. Oben rechts den **Entwicklermodus** einschalten.
 3. Auf **„Entpackte Erweiterung laden“** klicken und den entpackten Ordner auswählen.
 4. Auf der Willkommensseite (oder im Popup der Erweiterung) **„Sprachpakete laden“** anklicken und warten,
-   bis *bereit* dasteht. Ein Klick lädt alle Pakete: vereinfachtes und traditionelles Chinesisch → Englisch
-   für Webseiten und Englisch → Chinesisch für die Schreibhilfe. Das ist nur einmal nötig.
+   bis *bereit* dasteht. Ein Klick lädt beide Pakete: Chinesisch → Englisch für Webseiten und
+   Englisch → Chinesisch für die Schreibhilfe. Das ist nur einmal nötig.
 
 **Fertig.** Chinesische Webseiten werden jetzt automatisch übersetzt. Schon offene Tabs einmal neu laden.
 
@@ -106,8 +107,6 @@ Alles über das Symbol der Erweiterung (eventuell zuerst auf das Puzzle-Symbol k
   *bereit* dasteht.
 - **Das Popup meldet, dass der Übersetzer nicht verfügbar ist:** Chrome aktualisieren (Version 138 oder neuer)
   und auf einem Computer verwenden.
-- **Seiten in traditionellem Chinesisch (Taiwan, Hongkong) bleiben nach einem Update chinesisch:** Das
-  Paket dafür ist neu; im Popup einmal **„Sprachpakete laden“** klicken.
 - **Ein Bild wird nicht übersetzt:** Sehr kleine Bilder werden ausgelassen; Rechtsklick → **„Bild übersetzen“**.
 
 ## Bekannte Grenzen

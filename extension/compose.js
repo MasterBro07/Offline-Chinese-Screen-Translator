@@ -4,7 +4,7 @@
 // Privacy: the typed text is translated on this device (Chrome's Translator API, en -> zh),
 // never stored, and only written into the field when the user asks for it.
 // Nothing from the page is parsed as HTML; the bar lives in its own shadow root, so page CSS
-// cannot change it, and it is marked translate="no" so the page translation leaves it alone.
+// cannot change it, and the page translation (content.js) skips it.
 
 (() => {
   'use strict';

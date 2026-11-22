@@ -4,7 +4,7 @@
 // the original again. Right-click → "Bild übersetzen" translates any single image right away.
 //
 // Nothing from the page is parsed as HTML; the overlays live in their own shadow root, marked
-// translate="no" so the page translation leaves them alone.
+// as the extension's own UI, so the page translation (content.js) skips them.
 
 (() => {
   'use strict';

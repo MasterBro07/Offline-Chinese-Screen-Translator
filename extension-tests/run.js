@@ -280,6 +280,17 @@ async function fakeChecks() {
     const directHant = await popup.evaluate(() => chrome.runtime.sendMessage({ type: 'translate', source: 'zh', target: 'en', texts: ['這個', '这个'] }));
     ok(directHant && directHant.ok && directHant.translations.join('|') === 'EN[这个]|EN[这个]', 'traditional: decided per text inside one batch', JSON.stringify(directHant));
 
+    // --- 6a2. pages that mark themselves "do not translate" (translate="no", class notranslate)
+    {
+      const np = await ctx.newPage();
+      await np.goto(base + 'notranslate.html');
+      ok(await until(async () => (await np.textContent('#p1')) === 'EN[营业时间：11:00 ~ 21:00]', 8000),
+        'notranslate: a page marked translate="no" / notranslate is still translated', await np.textContent('#p1'));
+      ok((await np.textContent('#p2')) === 'EN[实习师]' && (await np.getAttribute('#i1', 'placeholder')) === 'EN[请输入姓名]' && (await np.title()) === 'EN[线上预约]',
+        'notranslate: marked elements, attributes and title too', await np.textContent('#p2'));
+      await np.close();
+    }
+
     // --- 6b. writing helper: type English, insert Chinese
     ok(await stateIs((x) => x.writeReady === true), 'compose: engineState writeReady with the fake translator', JSON.stringify(await engineState()));
     ok(await until(async () => (await popup.textContent('#compose-status')) === 'bereit') && await popup.isChecked('#compose'),

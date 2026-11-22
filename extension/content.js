@@ -17,11 +17,14 @@
   const OBSERVED_ATTRS = [...ATTRS, 'value', 'label'];
   const BUTTON_INPUT_TYPES = new Set(['button', 'submit', 'reset']);
   const EDITABLE = '[contenteditable=""],[contenteditable="true"],[contenteditable="plaintext-only"]';
-  const NO_TRANSLATE = '[translate="no"],.notranslate';
+  // The extension's own overlays (image boxes, writing helper). Pages' own "do not translate" markers
+  // (translate="no", class notranslate) are ignored on purpose: many sites put them on the whole page to
+  // keep online translators from rebuilding their DOM, but this extension only changes text values.
+  const OWN_UI = 'auto-translator-compose,auto-translator-images';
   // Text inside these elements is never translated.
-  const TEXT_SKIP = 'script,style,noscript,textarea,code,pre,' + EDITABLE + ',' + NO_TRANSLATE;
+  const TEXT_SKIP = 'script,style,noscript,textarea,code,pre,' + EDITABLE + ',' + OWN_UI;
   // Attributes of these elements (or their descendants) are never translated.
-  const ATTR_SKIP = 'script,style,noscript,' + EDITABLE + ',' + NO_TRANSLATE;
+  const ATTR_SKIP = 'script,style,noscript,' + EDITABLE + ',' + OWN_UI;
   const XHTML = 'http://www.w3.org/1999/xhtml';
   const ON_DEVICE = 'chrome';
 

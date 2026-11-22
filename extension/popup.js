@@ -4,7 +4,6 @@
   'use strict';
 
   const $ = (id) => document.getElementById(id);
-  const appStatus = $('app-status');
   const enabledBox = $('enabled');
   const siteRow = $('site-row');
   const siteBox = $('site-off');
@@ -25,21 +24,13 @@
     hint: $('api-hint'),
   });
 
-  // -------------------------------------------------------------- desktop app
+  // ------------------------------------------------------------------ engine
 
   function renderApp(state) {
-    const connected = !!(state && state.bridgeConnected);
-    appStatus.textContent = connected ? 'verbunden' : 'nicht verbunden';
-    appStatus.dataset.state = connected ? 'available' : 'off';
-
-    // Which engine translates web pages right now.
-    const engine = state && typeof state.pageEngine === 'string' ? state.pageEngine : 'chrome';
-    const viaApp = connected && engine !== 'chrome';
-    pageEngine.textContent = viaApp ? 'Desktop-App' : 'Chrome-Übersetzer';
-    pageEngine.dataset.state = viaApp || (state && state.ready) ? 'available' : 'off';
-    engineHint.textContent = viaApp
-      ? 'Chinesisch → Englisch über die Desktop-App. Fällt sie aus, übersetzt Chrome direkt auf diesem Gerät.'
-      : 'Chinesisch → Englisch, kostenlos und direkt auf diesem Gerät.';
+    const ready = !!(state && state.ready);
+    pageEngine.textContent = ready ? 'bereit' : 'Sprachpaket fehlt';
+    pageEngine.dataset.state = ready ? 'available' : 'downloadable';
+    engineHint.textContent = 'Chinesisch → Englisch, kostenlos und direkt auf diesem Gerät.';
 
     // Writing helper (English -> Chinese).
     const writeReady = !!(state && state.writeReady);

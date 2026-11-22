@@ -1,59 +1,48 @@
 name: Release
 
-# Start by hand: Actions → Release → "Run workflow". Builds the app and the extension and
-# publishes both as ZIP files on a new GitHub Release (downloadable without a GitHub account).
+# Start by hand: Actions → Release → "Run workflow". Packs the Chrome extension (with the offline
+# text recognition) and publishes it as a ZIP file on a new GitHub Release (downloadable without a
+# GitHub account).
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version number, e.g. 1.0.0"
+        description: "Version number, e.g. 2.0.0"
         required: true
-        default: "1.0.0"
+        default: "2.0.0"
 
 permissions:
   contents: write
 
 jobs:
   release:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - name: Fetch offline OCR files (models + runtime, checked against npm integrity)
         run: node tools/fetch-ocr-assets.mjs
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 8.0.x
-
-      - name: Test Core
-        run: dotnet test tests/AutoTranslator.Core.Tests -c Release
-
-      - name: Publish desktop app
-        run: dotnet publish src/AutoTranslator.App -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
-
       - name: Package
-        shell: pwsh
-        run: |
-          Compress-Archive -Path publish/* -DestinationPath AutoTranslator-windows-x64.zip
-          Compress-Archive -Path extension/* -DestinationPath AutoTranslator-chrome-extension.zip
+        run: cd extension && zip -qr ../AutoTranslator-chrome-extension.zip .
 
       - name: Create release
-        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
         run: |
-          $notes = @"
-          Translates Chinese text on screen into English automatically. 100 % offline.
+          cat > notes.md <<NOTES
+          Translates Chinese text in Chrome into English automatically, 100 % offline: page text, text in images, and a writing helper (type English, insert Chinese).
 
-          **Downloads**
-          - ``AutoTranslator-windows-x64.zip``: the Windows app (unzip, run ``AutoTranslator.exe``)
-          - ``AutoTranslator-chrome-extension.zip``: the Chrome extension (unzip, load it on ``chrome://extensions`` with Developer mode → Load unpacked)
+          **Download:** \`AutoTranslator-chrome-extension.zip\`, unzip it and load the folder on \`chrome://extensions\` (Developer mode → Load unpacked).
 
           Step-by-step setup: see the [README](https://github.com/${{ github.repository }}#installation-tutorial).
-          "@
-          gh release create "v$env:VERSION" AutoTranslator-windows-x64.zip AutoTranslator-chrome-extension.zip `
-            --target "${{ github.sha }}" --title "AutoTranslator $env:VERSION" --notes $notes
+          NOTES
+          gh release create "v$VERSION" AutoTranslator-chrome-extension.zip \
+            --target "${{ github.sha }}" --title "AutoTranslator $VERSION" --notes-file notes.md

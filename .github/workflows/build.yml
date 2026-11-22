@@ -1,5 +1,6 @@
 name: Build
 
+# Packs the Chrome extension, including the offline text recognition for images.
 on:
   push:
   workflow_dispatch:
@@ -9,34 +10,21 @@ permissions:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - name: Fetch offline OCR files (models + runtime, checked against npm integrity)
         run: node tools/fetch-ocr-assets.mjs
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 8.0.x
-
-      - name: Test Core
-        run: dotnet test tests/AutoTranslator.Core.Tests -c Release
-
-      # Self-contained single-file exe: the user does not need to install .NET.
-      # No trimming: WPF does not support it.
-      - name: Publish desktop app
-        if: ${{ !cancelled() }}
-        run: dotnet publish src/AutoTranslator.App -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
-
-      - name: Upload desktop app
-        uses: actions/upload-artifact@v4
-        with:
-          name: AutoTranslator-windows
-          path: publish/
-          if-no-files-found: error
+      - name: Syntax check
+        run: for f in extension/*.js extension/ocr/ocr.js tools/*.mjs; do node --check "$f"; done
 
       - name: Upload Chrome extension
         uses: actions/upload-artifact@v4

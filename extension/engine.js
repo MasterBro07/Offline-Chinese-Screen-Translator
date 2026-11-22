@@ -1,50 +1,31 @@
 // Translation engine. Runs in exactly one extension document at a time:
 // offscreen.html (preferred) or engine.html (pinned tab fallback).
 //
-// Owns the Translator instances (Chrome built-in, on-device) and the WebSocket
-// to the desktop app (bridge protocol version 2, see docs/ARCHITECTURE.md).
-// Only chrome.runtime is used here: offscreen documents have no other APIs.
+// Owns the Translator instances (Chrome built-in, on-device) and the offline text
+// recognition for images (ocr/ocr.js). Only chrome.runtime is used here: offscreen
+// documents have no other extension APIs.
 //
-// Two kinds of work arrive here:
-//   - `translate` requests from the desktop app: always answered with the
-//     on-device translator (never forwarded back to the app, so no loops).
-//   - page batches from content scripts (via the service worker): sent to the
-//     app as `page-translate` while the app offers a premium engine, with a
-//     per-batch fallback to the on-device translator.
+// Work arrives from content scripts via the service worker:
+//   - page batches (Chinese -> English) and writing-helper text (English -> Chinese)
+//   - images: recognise the Chinese text, then translate it
 
 (() => {
   'use strict';
 
   const HOST = location.pathname.endsWith('/offscreen.html') ? 'offscreen' : 'tab';
-  const PROTOCOL_VERSION = 2;
-  const RECONNECT_DELAY_MS = 2500;
   const POLL_NOT_READY_MS = 5000;
   const POLL_READY_MS = 60000;
   const CACHE_CAPACITY = 5000;
   const READY_PAIR = { source: 'zh', target: 'en' };
   const WRITE_PAIR = { source: 'en', target: 'zh' }; // writing helper: English in, Chinese out
-  const PAGE_TIMEOUT_MS = 10000; // the app must answer a page batch within this time
-  const PREMIUM_COOLDOWN_MS = 30000; // after a timeout the app is not asked for a while
   const ON_DEVICE = 'chrome'; // engine tag of the on-device translator
 
   let translatorApi = null; // the global Translator (or the test fake)
   let availability = 'unavailable';
   let ready = false;
   let writeReady = false; // en -> zh language pack present (writing helper)
-  let bridgeConnected = false;
-  let socket = null;
-  let bridgePort = 47613;
   let pollTimer = null;
   let stopped = false;
-
-  // Premium engine offered by the desktop app (bridge protocol version 2).
-  let appPremium = false; // last `app-state.premium` of the current connection
-  let appEngine = 'app'; // last `app-state.engine`, sanitised
-  let usePremium = true; // user setting (popup)
-  let premiumPausedUntil = 0; // cooldown after a timeout
-  let cooldownTimer = null;
-  let pageSeq = 0;
-  const pagePending = new Map(); // id -> { resolve, reject, timer }
 
   // ------------------------------------------------------------- backend hook
 
@@ -65,8 +46,10 @@
       create: async (o) => {
         if (packMissing || !known(o)) throw new Error('language pack missing');
         const tag = o.targetLanguage === 'zh' ? 'ZH' : 'EN';
+        // A few real words, so tests can check spacing between translated inline pieces.
+        const words = o.targetLanguage === 'en' ? { 免费: 'Free', 送货: 'shipping', 包邮: 'Free', 退货: 'returns' } : {};
         return {
-          translate: async (text) => tag + '[' + text + ']',
+          translate: async (text) => words[text] || tag + '[' + text + ']',
           destroy() {},
         };
       },
@@ -243,109 +226,9 @@
     return run;
   }
 
-  // ------------------------------------------------- premium engine (the app)
-
-  /** True while page batches should go to the desktop app. */
-  function premiumActive() {
-    return bridgeConnected && appPremium && usePremium && Date.now() >= premiumPausedUntil;
-  }
-
-  function sanitizeEngineName(name) {
-    const s = typeof name === 'string' ? name.trim().toLowerCase() : '';
-    return /^[a-z0-9._-]{1,32}$/.test(s) && s !== ON_DEVICE ? s : 'app';
-  }
-
-  function rejectPagePending(reason) {
-    for (const [id, entry] of pagePending) {
-      clearTimeout(entry.timer);
-      pagePending.delete(id);
-      entry.reject(new Error(reason));
-    }
-  }
-
-  /** The app did not answer in time: do not make every batch wait for it. */
-  function pausePremium() {
-    premiumPausedUntil = Date.now() + PREMIUM_COOLDOWN_MS;
-    clearTimeout(cooldownTimer);
-    cooldownTimer = setTimeout(pushState, PREMIUM_COOLDOWN_MS + 50);
-    pushState();
-  }
-
-  /** One `page-translate` round trip. Rejects on page-error, timeout or disconnect. */
-  function requestPageTranslation(texts, source, target) {
-    return new Promise((resolve, reject) => {
-      const ws = socket;
-      if (!ws || ws.readyState !== WebSocket.OPEN) { reject(new Error('not connected')); return; }
-      const id = 'p' + (++pageSeq);
-      const timer = setTimeout(() => {
-        if (!pagePending.delete(id)) return;
-        pausePremium();
-        reject(new Error('timeout'));
-      }, PAGE_TIMEOUT_MS);
-      pagePending.set(id, { resolve, reject, timer });
-      try {
-        ws.send(JSON.stringify({ type: 'page-translate', id, source, target, texts }));
-      } catch (e) {
-        clearTimeout(timer);
-        pagePending.delete(id);
-        reject(e);
-      }
-    });
-  }
-
-  function settlePageRequest(message) {
-    const entry = pagePending.get(message.id);
-    if (!entry) return; // unknown id, or an answer that arrived after the timeout
-    clearTimeout(entry.timer);
-    pagePending.delete(message.id);
-    if (message.type === 'page-result') entry.resolve(message.translations);
-    else entry.reject(new Error(typeof message.message === 'string' ? message.message : 'page-error'));
-  }
-
-  /**
-   * Translates a page batch through the app. Order is kept (the app's engine
-   * benefits from context); duplicates and cached texts are not sent again.
-   */
-  async function translateViaApp(texts, source, target) {
-    const engine = appEngine;
-    const prefix = engine + '|' + source + '|' + target + '|';
-    const parts = [];
-    const index = new Map(); // core -> position in `wanted`
-    const wanted = [];
-    for (const raw of texts) {
-      const part = splitWhitespace(typeof raw === 'string' ? raw : raw == null ? '' : String(raw));
-      parts.push(part);
-      if (!part.core) { part.value = ''; continue; }
-      part.value = cacheGet(prefix + part.core);
-      if (part.value === undefined && !index.has(part.core)) {
-        index.set(part.core, wanted.length);
-        wanted.push(part.core);
-      }
-    }
-    if (wanted.length > 0) {
-      const answer = await requestPageTranslation(wanted, source, target);
-      if (!Array.isArray(answer) || answer.length !== wanted.length || !answer.every((t) => typeof t === 'string')) {
-        throw new Error('malformed page-result');
-      }
-      wanted.forEach((core, i) => cacheSet(prefix + core, answer[i]));
-      for (const part of parts) if (part.value === undefined) part.value = answer[index.get(part.core)];
-    }
-    return { engine, translations: parts.map((p) => p.lead + p.value + p.trail) };
-  }
-
-  /** Page batches: premium engine while offered; on-device otherwise or on failure. */
+  /** Page batches and writing-helper text: always the on-device translator. */
   async function translateForPages(texts, source, target) {
     if (!Array.isArray(texts)) throw new Error('texts must be an array');
-    // Only Chinese page text goes to the app; the writing helper (en -> zh) always stays on-device.
-    const fromChinese = /^zh/i.test(String(source || 'zh')) && String(target || 'en').toLowerCase() === 'en';
-    if (fromChinese && premiumActive()) {
-      try {
-        return await translateViaApp(texts, source || 'zh', target || 'en');
-      } catch (e) {
-        // page-error, timeout, disconnect or malformed answer:
-        // on-device fallback for this batch.
-      }
-    }
     return { engine: ON_DEVICE, translations: await enqueueBatch(texts, source, target) };
   }
 
@@ -361,32 +244,24 @@
     }
   }
 
-  function currentDetail() {
-    return translatorApi ? detailFor(availability) : detailFor('no-api');
-  }
-
   /**
    * Published to chrome.storage.local "engineState" by the service worker.
-   *   ready        on-device translator usable (language pack present)
-   *   premium      the connected app offers a better engine for pages
-   *   usePremium   user setting
-   *   pagesReady   pages can be translated right now (on-device OR via the app)
-   *   pageEngine   engine for new page text: "chrome" or the app's engine name
+   *   ready        on-device translator usable (zh -> en language pack present)
+   *   pagesReady   pages can be translated right now (same as ready)
+   *   pageEngine   always "chrome" (the on-device translator)
    *   writeReady   writing helper usable (en -> zh language pack present)
+   *   detail       short German explanation when not ready
    */
   function currentState() {
-    const viaApp = premiumActive();
     return {
       apiPresent: !!translatorApi,
       availability,
       ready,
-      bridgeConnected,
       host: HOST,
-      premium: bridgeConnected && appPremium,
-      usePremium,
-      pagesReady: ready || viaApp,
-      pageEngine: viaApp ? appEngine : ON_DEVICE,
+      pagesReady: ready,
+      pageEngine: ON_DEVICE,
       writeReady,
+      detail: translatorApi ? detailFor(availability) : detailFor('no-api'),
     };
   }
 
@@ -405,11 +280,9 @@
     const nextWriteReady = nextWrite === 'available';
     const changed = next !== availability || nextReady !== ready || nextWriteReady !== writeReady;
     writeReady = nextWriteReady;
-    const readyChanged = nextReady !== ready;
     availability = next;
     ready = nextReady;
     if (changed) pushState();
-    if (readyChanged) bridgeSend({ type: 'status', ready, detail: currentDetail() });
     schedulePoll();
   }
 
@@ -417,91 +290,6 @@
     clearTimeout(pollTimer);
     if (stopped) return;
     pollTimer = setTimeout(recheck, ready && writeReady ? POLL_READY_MS : POLL_NOT_READY_MS);
-  }
-
-  // ------------------------------------------------------------ bridge client
-
-  function bridgeSend(message) {
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      try { socket.send(JSON.stringify(message)); } catch (e) { /* closed meanwhile */ }
-    }
-  }
-
-  function connectBridge() {
-    if (stopped) return;
-    let ws;
-    try {
-      ws = new WebSocket('ws://127.0.0.1:' + bridgePort + '/bridge');
-    } catch (e) {
-      setTimeout(connectBridge, RECONNECT_DELAY_MS);
-      return;
-    }
-    socket = ws;
-    ws.onopen = () => {
-      bridgeConnected = true;
-      appPremium = false; // until the app says otherwise (`app-state`)
-      bridgeSend({
-        type: 'hello',
-        version: PROTOCOL_VERSION,
-        engine: 'chrome-translator',
-        ready,
-        detail: currentDetail(),
-      });
-      pushState();
-    };
-    ws.onmessage = (event) => { handleBridgeMessage(ws, event.data); };
-    ws.onerror = () => { /* the desktop app is simply not running; stay quiet */ };
-    ws.onclose = () => {
-      if (socket === ws) {
-        socket = null;
-        // Everything learned from the app belongs to that connection.
-        const hadState = bridgeConnected || appPremium;
-        bridgeConnected = false;
-        appPremium = false;
-        appEngine = 'app';
-        premiumPausedUntil = 0;
-        clearTimeout(cooldownTimer);
-        rejectPagePending('disconnected');
-        if (hadState) pushState();
-      }
-      setTimeout(connectBridge, RECONNECT_DELAY_MS);
-    };
-  }
-
-  async function handleBridgeMessage(ws, data) {
-    let message;
-    try { message = JSON.parse(data); } catch (e) { return; }
-    if (!message || typeof message !== 'object') return;
-    const reply = (obj) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        try { ws.send(JSON.stringify(obj)); } catch (e) { /* closed meanwhile */ }
-      }
-    };
-    if (message.type === 'ping') {
-      reply({ type: 'pong' });
-    } else if (message.type === 'app-state') {
-      if (ws !== socket) return;
-      const premium = message.premium === true;
-      const engine = sanitizeEngineName(message.engine);
-      if (premium !== appPremium || engine !== appEngine) {
-        appPremium = premium;
-        appEngine = engine;
-        if (premium) { premiumPausedUntil = 0; clearTimeout(cooldownTimer); }
-        pushState();
-      }
-    } else if (message.type === 'page-result' || message.type === 'page-error') {
-      if (ws === socket && typeof message.id === 'string') settlePageRequest(message);
-    } else if (message.type === 'translate') {
-      // The desktop app asks: always the on-device translator, never the app itself.
-      const id = message.id;
-      try {
-        const translations = await enqueueBatch(message.texts, message.source, message.target);
-        reply({ type: 'result', id, translations });
-      } catch (e) {
-        reply({ type: 'error', id, message: String((e && e.message) || e) });
-        recheck();
-      }
-    }
   }
 
   // --------------------------------------------- messages from service worker
@@ -534,12 +322,6 @@
       });
       return true;
     }
-    if (message.type === 'engine.config') {
-      const next = message.usePremium !== false;
-      if (next !== usePremium) { usePremium = next; pushState(); }
-      sendResponse({ ok: true });
-      return false;
-    }
     return false;
   });
 
@@ -563,8 +345,6 @@
 
   async function init() {
     const config = (await askServiceWorker({ type: 'engine.getConfig' })) || {};
-    if (config.port) bridgePort = config.port;
-    usePremium = config.usePremium !== false;
     translatorApi = getTranslatorApi(config.debugFake);
 
     const hello = await askServiceWorker({ type: 'engine.hello', host: HOST, apiPresent: !!translatorApi });
@@ -576,7 +356,6 @@
     }
     await recheck();
     pushState();
-    connectBridge();
   }
 
   init();

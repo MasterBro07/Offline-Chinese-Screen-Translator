@@ -28,7 +28,6 @@
   const DEBOUNCE_MS = 150;
   const MAX_BATCH_TEXTS = 60;
   const MAX_BATCH_CHARS = 4000; // on-device translator
-  const MAX_BATCH_CHARS_PREMIUM = 6000; // app engine: larger batches carry more context
   const MAX_TEXT_CHARS = 20000; // longer single texts are not natural-language content
   const MAX_SCORED = 1000;
   const LOCAL_CACHE_CAPACITY = 3000;
@@ -483,14 +482,6 @@
     return dx + dy;
   }
 
-  function documentOrder(a, b) {
-    const x = a.node || a.el;
-    const y = b.node || b.el;
-    if (x === y) return 0;
-    const position = x.compareDocumentPosition(y);
-    return position & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : position & Node.DOCUMENT_POSITION_PRECEDING ? 1 : 0;
-  }
-
   /** Validates the pending sets and returns the still relevant candidates. */
   function collectCandidates() {
     const out = [];
@@ -546,9 +537,6 @@
     const wait = takeBudget();
     if (wait > 0) { schedule(wait); return; }
 
-    const premium = pageEngine !== ON_DEVICE;
-    const maxChars = premium ? MAX_BATCH_CHARS_PREMIUM : MAX_BATCH_CHARS;
-
     // Visible things first (only worth the layout cost when not everything fits).
     if (candidates.length > MAX_BATCH_TEXTS) {
       const scores = new Map();
@@ -563,19 +551,11 @@
       const group = groups.get(c.core);
       if (group) { group.push(c); continue; }
       if (groups.size >= MAX_BATCH_TEXTS) continue;
-      if (groups.size > 0 && chars + c.core.length > maxChars) continue;
+      if (groups.size > 0 && chars + c.core.length > MAX_BATCH_CHARS) continue;
       groups.set(c.core, [c]);
       chars += c.core.length;
     }
-    let texts = [...groups.keys()];
-    // The app's engine translates a batch as one piece of a page: give it the
-    // texts in reading (document) order.
-    if (premium && texts.length > 1) {
-      texts = texts
-        .map((core) => ({ core, first: groups.get(core)[0] }))
-        .sort((a, b) => documentOrder(a.first, b.first))
-        .map((entry) => entry.core);
-    }
+    const texts = [...groups.keys()];
 
     const myGeneration = generation;
     inflight = true;

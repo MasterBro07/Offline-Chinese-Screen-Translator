@@ -1,6 +1,7 @@
 // End-to-end tests for the Chrome extension in ../extension.
 //
-//   npm i playwright ws && npx playwright install chromium
+//   node tools/fetch-ocr-assets.mjs      (once: offline OCR files for images)
+//   npm i playwright && npx playwright install chromium
 //   node extension-tests/run.js            fake-translator checks (no language pack needed)
 //   node extension-tests/run.js --real     the same, then REAL on-device translation
 //
@@ -13,9 +14,9 @@
 //   --ext=PATH       extension folder (default ../extension)
 //
 // The fake checks use the extension's test hook (chrome.storage.local
-// "debugFakeTranslator"), which answers "EN[<text>]" instead of translating,
-// and a WebSocket server in this script that plays the desktop app and
-// answers page batches with "CL[<text>]".
+// "debugFakeTranslator"), which answers "EN[<text>]" instead of translating
+// (English -> Chinese: "ZH[<text>]"). Text in images is recognised with the
+// real offline OCR models.
 //
 // --real prints one line: REAL_TRANSLATION: OK | UNAVAILABLE | FAILED
 
@@ -27,7 +28,6 @@ const http = require('http');
 const os = require('os');
 const { execFileSync } = require('child_process');
 const { chromium } = require('playwright');
-const { WebSocketServer } = require('ws');
 
 const argv = process.argv.slice(2);
 const flag = (name) => argv.includes('--' + name);
@@ -40,7 +40,6 @@ const EXT = path.resolve(option('ext', path.join(__dirname, '..', 'extension')))
 const FIXTURES = path.join(__dirname, 'fixtures');
 const CHANNEL = option('channel', 'chromium');
 const HEADLESS = !flag('headed');
-const WS_PORT = Number(option('port', '47999'));
 const HAN = /\p{Script=Han}/u;
 
 let failed = 0;
@@ -121,36 +120,6 @@ function staticChecks() {
 async function fakeChecks() {
   staticChecks();
 
-  // --- fake desktop app (bridge server)
-  const wss = new WebSocketServer({ port: WS_PORT, path: '/bridge' });
-  const inbox = [];
-  const origins = [];
-  let client = null;
-  // mode: "answer" | "error" | "silent" (never answers) ; state: sent after every hello
-  const app = { state: { premium: false, engine: 'claude' }, mode: 'answer', pageReqs: [], answers: {} };
-  wss.on('connection', (ws, req) => {
-    origins.push(req.headers.origin);
-    client = ws;
-    ws.on('message', (d) => {
-      const m = JSON.parse(d.toString());
-      if (m.type === 'page-translate') {
-        app.pageReqs.push(m);
-        if (app.mode === 'answer') {
-          ws.send(JSON.stringify({ type: 'page-result', id: m.id, translations: m.texts.map((t) => (t in app.answers ? app.answers[t] : 'CL[' + t + ']')) }));
-        } else if (app.mode === 'error') {
-          ws.send(JSON.stringify({ type: 'page-error', id: m.id, message: 'Tageslimit erreicht' }));
-        }
-        return;
-      }
-      inbox.push(m);
-      if (m.type === 'hello' && app.state) ws.send(JSON.stringify({ type: 'app-state', ...app.state }));
-    });
-  });
-  const send = (obj) => client.send(JSON.stringify(obj));
-  const setAppState = (state) => { app.state = state; send({ type: 'app-state', ...state }); };
-  const nextMsg = (pred, timeout = 8000) => until(() => { const i = inbox.findIndex(pred); return i >= 0 ? inbox.splice(i, 1)[0] : null; }, timeout, 50);
-  const sentTexts = () => app.pageReqs.flatMap((r) => r.texts);
-
   const server = await startFixtureServer();
   const base = 'http://localhost:' + server.address().port + '/';
 
@@ -180,26 +149,14 @@ async function fakeChecks() {
     console.log('INFO real engine state (no fake):', JSON.stringify(real), 'mode', (await local('engineMode')).engineMode);
     if (real && real.apiPresent) {
       ok(real.host === 'offscreen', 'REAL Translator API is exposed in the offscreen document of this browser');
-      await swEval((port) => chrome.storage.local.set({ bridgePort: port }), WS_PORT);
-      const h0 = await nextMsg((m) => m.type === 'hello');
-      console.log('INFO real hello:', JSON.stringify(h0));
-      ok(h0 && h0.ready === (real.availability === 'available'), 'real API: hello.ready matches availability');
-      if (h0 && !h0.ready) {
-        send({ type: 'translate', id: '1', source: 'zh', target: 'en', texts: ['你好'] });
-        const e0 = await nextMsg((m) => m.id === '1');
-        ok(e0 && e0.type === 'error', 'real API, pack missing: translate -> error', JSON.stringify(e0));
-      }
-    } else {
-      await swEval((port) => chrome.storage.local.set({ bridgePort: port }), WS_PORT);
     }
     if (welcome) {
       const wtxt = await welcome.innerText('body');
-      ok(/Sprachpakete laden/.test(wtxt) && /Auf Chinesisch schreiben/.test(wtxt) && /Desktop-App/.test(wtxt), 'welcome page shows German steps incl. writing helper');
+      ok(/Sprachpakete laden/.test(wtxt) && /Auf Chinesisch schreiben/.test(wtxt) && /Text in Bildern/.test(wtxt) && !/Desktop-App/.test(wtxt), 'welcome page shows German steps incl. images and writing helper, no desktop app');
       ok(!/Claude|API-Schlüssel/.test(wtxt), 'welcome page does not mention Claude or API keys');
     }
 
     // --- 1. simulate missing Translator API: offscreen -> tab -> none
-    inbox.length = 0;
     await swEval(() => chrome.storage.local.set({ debugFakeTranslator: 'none' }));
     const none = await until(async () => (await local('engineMode')).engineMode === 'none', 15000);
     ok(none, 'API missing everywhere: engine mode falls back offscreen -> tab -> none', JSON.stringify(await local(null)));
@@ -214,29 +171,14 @@ async function fakeChecks() {
     ok((await page.textContent('#h')) === '  你好世界  ', 'page untouched while engine unavailable');
 
     // --- 3. enable fake translator in the offscreen host
-    inbox.length = 0;
     await swEval(() => chrome.storage.local.set({ debugFakeTranslator: 'all', engineMode: 'offscreen' }));
-    const hello = await nextMsg((m) => m.type === 'hello');
-    ok(hello && hello.version === 2 && hello.engine === 'chrome-translator' && hello.ready === true && hello.detail === '',
-      'bridge: hello (protocol version 2)', JSON.stringify(hello));
-    ok(origins.length > 0 && origins.every((o) => o === 'chrome-extension://' + extId), 'bridge: Origin is chrome-extension://<this extension>', origins.join());
+    const st = await stateIs((s) => s.ready && s, 15000);
     ok(await swEval(() => chrome.offscreen.hasDocument()), 'engine hosted in offscreen document');
-    const st = await stateIs((s) => s.ready && s.bridgeConnected && s);
     ok(st && st.host === 'offscreen', 'engineState in storage', JSON.stringify(st));
-    ok(st && st.pagesReady === true && st.pageEngine === 'chrome' && st.premium === false, 'engineState: pagesReady, pageEngine chrome, no premium', JSON.stringify(st));
-
-    send({ type: 'translate', id: '42', source: 'zh', target: 'en', texts: ['你好', '', '  世界 ', '第一行\n第二行', '   ', '你好'] });
-    const res = await nextMsg((m) => m.id === '42');
-    ok(res && res.type === 'result' && JSON.stringify(res.translations) === JSON.stringify(['EN[你好]', '', '  EN[世界] ', 'EN[第一行]\nEN[第二行]', '   ', 'EN[你好]']),
-      'bridge: translate -> result (order, length, whitespace, line breaks)', JSON.stringify(res));
-    send({ type: 'ping' });
-    ok(!!(await nextMsg((m) => m.type === 'pong')), 'bridge: ping -> pong');
-    send({ type: 'translate', id: '43', source: 'zh', target: 'en', texts: 'oops' });
-    const err = await nextMsg((m) => m.id === '43');
-    ok(err && err.type === 'error' && typeof err.message === 'string', 'bridge: invalid request -> error', JSON.stringify(err));
-    send({ type: 'translate', id: '44', source: 'zh-Hans', target: 'en', texts: [] });
-    const empty = await nextMsg((m) => m.id === '44');
-    ok(empty && empty.type === 'result' && empty.translations.length === 0, 'bridge: empty batch');
+    ok(st && st.pagesReady === true && st.pageEngine === 'chrome' && st.detail === '', 'engineState: pagesReady, on-device engine', JSON.stringify(st));
+    ok(st && !('bridgeConnected' in st) && !('premium' in st), 'engineState: no desktop-app fields left', JSON.stringify(st));
+    const stats = () => swEval(() => globalThis.autoTranslatorStats);
+    const resetStats = () => swEval(() => { const st = globalThis.autoTranslatorStats; st.requests = 0; st.texts.length = 0; st.batches.length = 0; });
 
     // --- 4. queued page resumes without reload once the engine is ready
     ok(await until(async () => (await page.textContent('#h')) === '  EN[你好世界]  ', 8000), 'queued page translated after engine became ready (whitespace kept)', await page.textContent('#h'));
@@ -309,11 +251,12 @@ async function fakeChecks() {
     // --- 6. popup
     const popup = await ctx.newPage();
     await popup.goto(`chrome-extension://${extId}/popup.html`);
-    await until(async () => (await popup.textContent('#app-status')) === 'verbunden', 4000);
     const ptxt = await popup.innerText('body');
-    ok(/Sprachpaket/.test(ptxt) && /Desktop-App/.test(ptxt) && /Webseiten automatisch übersetzen/.test(ptxt), 'popup renders German UI');
-    ok((await popup.textContent('#app-status')) === 'verbunden', 'popup: Desktop-App verbunden', await popup.textContent('#app-status'));
-    ok((await popup.textContent('#page-engine')) === 'Chrome-Übersetzer', 'popup: Webseiten: Chrome-Übersetzer (no premium)', await popup.textContent('#page-engine'));
+    ok(/Sprachpaket/.test(ptxt) && !/Desktop-App/.test(ptxt) && /Webseiten automatisch übersetzen/.test(ptxt) && /Bilder automatisch übersetzen/.test(ptxt), 'popup renders German UI (no desktop app)');
+    ok(await until(async () => (await popup.textContent('#page-engine')) === 'bereit'), 'popup: Webseiten bereit', await popup.textContent('#page-engine'));
+    const direct = await popup.evaluate(() => chrome.runtime.sendMessage({ type: 'translate', source: 'zh', target: 'en', texts: ['你好', '', '  世界 ', '第一行\n第二行', '   ', '你好'] }));
+    ok(direct && direct.ok && JSON.stringify(direct.translations) === JSON.stringify(['EN[你好]', '', '  EN[世界] ', 'EN[第一行]\nEN[第二行]', '   ', 'EN[你好]']),
+      'translate message: order, length, whitespace, line breaks', JSON.stringify(direct));
     ok(!(await popup.$('#use-premium')) && !/Claude|API-Schlüssel/.test(ptxt), 'popup: no premium setting, no Claude/API mention');
     console.log('INFO popup pack status (real API):', await popup.textContent('#pack-status'), '| button visible:', await popup.isVisible('#download'), '| hint visible:', await popup.isVisible('#api-hint'));
     await popup.uncheck('#enabled');
@@ -486,65 +429,37 @@ async function fakeChecks() {
       await ip.close();
     }
 
-    ok(app.pageReqs.length === 0, 'v2: no page-translate is ever sent while premium is false', String(app.pageReqs.length));
-
-    // =================================================== protocol version 2
-    // --- 9. app-state premium on: engine switch in the middle of a page
-    setAppState({ premium: true, engine: 'claude' });
-    const prem = await stateIs((x) => x.premium && x.pageEngine === 'claude' && x);
-    ok(prem && prem.pagesReady && prem.ready, 'v2: app-state premium:true -> engineState premium, pageEngine claude', JSON.stringify(await engineState()));
-    ok(await until(async () => (await popup.textContent('#page-engine')) === 'Desktop-App', 4000), 'popup: Webseiten: Desktop-App', await popup.textContent('#page-engine'));
-    await sleep(1000);
-    ok(app.pageReqs.length === 0 && (await page.textContent('#h')) === '  EN[你好世界]  ', 'v2: engine switch does not re-translate the page', JSON.stringify(sentTexts()));
-    await page.evaluate(() => { document.getElementById('dyn').innerHTML = '<span id=n1>新文本</span><span id=n2>动态</span>'; });
-    ok(await until(async () => (await page.textContent('#n1')) === 'CL[新文本]' && (await page.textContent('#n2')) === 'CL[动态]'), 'v2: page-translate round trip, new text comes from the app',
-      await page.textContent('#dyn'));
-    const r0 = app.pageReqs[0];
-    ok(r0 && typeof r0.id === 'string' && r0.source === 'zh' && r0.target === 'en' && Array.isArray(r0.texts), 'v2: page-translate message shape', JSON.stringify(r0));
-    ok(sentTexts().includes('动态'), 'v2: caches are per engine (text known on-device is asked again from the app)', JSON.stringify(sentTexts()));
-    // the app's own requests still use the on-device translator
-    const before = app.pageReqs.length;
-    send({ type: 'translate', id: '50', source: 'zh', target: 'en', texts: ['新文本', '别的'] });
-    const r50 = await nextMsg((m) => m.id === '50');
-    ok(r50 && JSON.stringify(r50.translations) === JSON.stringify(['EN[新文本]', 'EN[别的]']) && app.pageReqs.length === before,
-      'v2: bridge translate stays on-device while premium is on (no loop)', JSON.stringify(r50));
-
-    // --- 10. shop page under premium: order, batches, robustness
-    app.pageReqs.length = 0;
-    app.answers = { 免费: 'Free', 送货: 'shipping', 包邮: 'Free', 退货: 'returns' };
+    // --- 10. shop page: inline pieces, select, SVG, shadow roots, frames, mutation storm, batches
+    await resetStats();
     const shop = await ctx.newPage();
     await shop.goto(base + 'shop.html');
     const text = (sel) => shop.evaluate((q) => document.querySelector(q).textContent, sel);
-    ok(await until(async () => (await text('#order p:last-child')) === 'CL[顺序五]' && (await text('#o3')) === 'CL[大号]'), 'shop page translated through the app');
-    const firstReq = app.pageReqs.find((r) => r.texts.includes('顺序一'));
-    const firstTexts = firstReq ? firstReq.texts : [];
-    const positions = ['顺序一', '顺序二', '顺序三', '顺序四', '顺序五', '满', '减', '手机壳', '红色', '蓝色', '大号', '销量'].map((t) => firstTexts.indexOf(t));
-    ok(positions.every((p, i) => p >= 0 && (i === 0 || p > positions[i - 1])), 'v2: batch is sent in document order (texts and attributes interleaved)', JSON.stringify(firstTexts));
-    ok((await text('#promo')) === 'CL[满]300 CL[减]50', 'inline pieces: numbers kept, gap added before a piece that follows a digit', await text('#promo'));
-    ok((await text('#latin')) === 'iPhone CL[手机壳]', 'inline pieces: gap after Latin text', await text('#latin'));
+    ok(await until(async () => (await text('#order p:last-child')) === 'EN[顺序五]' && (await text('#o3')) === 'EN[大号]'), 'shop page translated');
+    ok((await text('#promo')) === 'EN[满]300 EN[减]50', 'inline pieces: numbers kept, gap added before a piece that follows a digit', await text('#promo'));
+    ok((await text('#latin')) === 'iPhone EN[手机壳]', 'inline pieces: gap after Latin text', await text('#latin'));
     ok((await text('#pair')) === 'Free shipping', 'inline pieces: adjacent translated spans do not run together', await text('#pair'));
     ok((await text('#flexpair')) === 'Freereturns', 'inline pieces: separate boxes (flex items) get no extra space', await text('#flexpair'));
-    ok((await text('#spaced')) === 'CL[买] CL[二] CL[送] CL[一]', 'inline pieces: existing whitespace kept as is', await text('#spaced'));
-    ok((await text('#price')) === '¥199.00' && !sentTexts().some((t) => t.includes('199.00')), 'price without Chinese is never touched or sent');
-    ok((await text('#sold')) === 'CL[已售 1.2万+]' && (await text('#range')) === 'CL[¥1,299.00 - ¥2,499.00 起]', 'number-heavy strings go through as one piece', await text('#sold') + ' | ' + await text('#range'));
+    ok((await text('#spaced')) === 'EN[买] EN[二] EN[送] EN[一]', 'inline pieces: existing whitespace kept as is', await text('#spaced'));
+    ok((await text('#price')) === '¥199.00' && !(await stats()).texts.some((t) => t.includes('199.00')), 'price without Chinese is never touched or sent');
+    ok((await text('#sold')) === 'EN[已售 1.2万+]' && (await text('#range')) === 'EN[¥1,299.00 - ¥2,499.00 起]', 'number-heavy strings go through as one piece', await text('#sold') + ' | ' + await text('#range'));
 
     const sel = await shop.evaluate(() => {
       const q = (id) => document.getElementById(id);
       return { o1: q('o1').textContent, o1v: q('o1').value, o2: q('o2').textContent, o2v: q('o2').value, o3v: q('o3').value, og: q('og').label, value: q('sel').value };
     });
-    ok(sel.o1 === 'CL[红色]' && sel.o2 === 'CL[蓝色]' && sel.og === 'CL[尺码]', 'select: option text and optgroup label translated', JSON.stringify(sel));
+    ok(sel.o1 === 'EN[红色]' && sel.o2 === 'EN[蓝色]' && sel.og === 'EN[尺码]', 'select: option text and optgroup label translated', JSON.stringify(sel));
     ok(sel.o1v === '红色' && sel.o3v === '大号' && sel.o2v === 'b' && sel.value === 'b', 'select: submitted option values stay original', JSON.stringify(sel));
 
     const svg = await shop.evaluate(() => ({ t: document.getElementById('svgtext').textContent, title: document.getElementById('svgtitle').textContent, attr: document.getElementById('svgtext').hasAttribute('title') }));
-    ok(svg.t === 'CL[销量]' && svg.title === 'CL[图表标题]' && !svg.attr, 'SVG <text> and <title> translated, no title attribute on SVG elements', JSON.stringify(svg));
+    ok(svg.t === 'EN[销量]' && svg.title === 'EN[图表标题]' && !svg.attr, 'SVG <text> and <title> translated, no title attribute on SVG elements', JSON.stringify(svg));
 
-    ok(await until(() => shop.evaluate(() => document.getElementById('late').shadowRoot && document.getElementById('late').shadowRoot.getElementById('ls').textContent === 'CL[迟到的影子]'), 8000),
+    ok(await until(() => shop.evaluate(() => document.getElementById('late').shadowRoot && document.getElementById('late').shadowRoot.getElementById('ls').textContent === 'EN[迟到的影子]'), 8000),
       'shadow root attached after the scan is found and translated');
-    ok(await until(() => shop.evaluate(() => window.__closedRoot && window.__closedRoot.textContent === 'CL[封闭的影子]'), 8000), 'closed shadow root of a custom element translated');
+    ok(await until(() => shop.evaluate(() => window.__closedRoot && window.__closedRoot.textContent === 'EN[封闭的影子]'), 8000), 'closed shadow root of a custom element translated');
     await shop.evaluate(() => { document.getElementById('late').shadowRoot.getElementById('ls').textContent = '影子更新'; });
-    ok(await until(() => shop.evaluate(() => document.getElementById('late').shadowRoot.getElementById('ls').textContent === 'CL[影子更新]')), 'late shadow root is observed for later changes');
+    ok(await until(() => shop.evaluate(() => document.getElementById('late').shadowRoot.getElementById('ls').textContent === 'EN[影子更新]')), 'late shadow root is observed for later changes');
 
-    for (const [name, want] of [['f-same', 'CL[框架内容]'], ['f-cross', 'CL[框架内容]'], ['f-srcdoc', 'CL[内嵌文档]'], ['f-blank', 'CL[空白框架]']]) {
+    for (const [name, want] of [['f-same', 'EN[框架内容]'], ['f-cross', 'EN[框架内容]'], ['f-srcdoc', 'EN[内嵌文档]'], ['f-blank', 'EN[空白框架]']]) {
       const frame = shop.frames().find((f) => f.name() === name);
       const got = frame && await until(async () => (await frame.evaluate(() => document.getElementById('ft').textContent)) === want, 6000);
       ok(got, 'iframe translated: ' + name + (frame ? ' (' + frame.url().slice(0, 40) + ')' : ''), frame ? await frame.evaluate(() => document.body.textContent) : 'frame missing');
@@ -552,20 +467,21 @@ async function fakeChecks() {
 
     // mutation storm: 80 ticks, every 50 ms, on a text node and on a replaced container
     await sleep(500);
-    app.pageReqs.length = 0;
+    await resetStats();
     const stormStart = Date.now();
     const storm = shop.evaluate(() => window.startStorm(80, 50));
-    const staticOk = await until(async () => (await text('#static')) === 'CL[静态文本]', 3000, 50);
+    const staticOk = await until(async () => (await text('#static')) === 'EN[静态文本]', 3000, 50);
     ok(staticOk, 'storm: other text is still translated promptly while the page mutates every 50 ms', await text('#static'));
     await storm;
-    ok(await until(async () => (await text('#tick1')) === 'CL[剩余 80 秒]' && (await text('#tick2')) === 'CL[倒计时 80 秒]', 4000), 'storm: counters end up translated with the right number',
+    ok(await until(async () => (await text('#tick1')) === 'EN[剩余 80 秒]' && (await text('#tick2')) === 'EN[倒计时 80 秒]', 4000), 'storm: counters end up translated with the right number',
       await text('#tick1') + ' | ' + await text('#tick2'));
-    console.log('INFO storm: ' + app.pageReqs.length + ' requests, ' + sentTexts().length + ' texts for 160 text changes in ' + (Date.now() - stormStart) + ' ms');
-    ok(app.pageReqs.length <= 8 && sentTexts().length <= 16, 'storm: 160 text changes cause only a handful of requests (no request storm)', app.pageReqs.length + ' requests / ' + sentTexts().length + ' texts');
+    const stormStats = await stats();
+    console.log('INFO storm: ' + stormStats.requests + ' requests, ' + stormStats.texts.length + ' texts for 160 text changes in ' + (Date.now() - stormStart) + ' ms');
+    ok(stormStats.requests <= 8 && stormStats.texts.length <= 16, 'storm: 160 text changes cause only a handful of requests (no request storm)', stormStats.requests + ' requests / ' + stormStats.texts.length + ' texts');
     await sleep(700);
-    const quiet = app.pageReqs.length;
+    const quiet = (await stats()).requests;
     await sleep(700);
-    ok(app.pageReqs.length === quiet, 'storm: no requests after the page went quiet');
+    ok((await stats()).requests === quiet, 'storm: no requests after the page went quiet');
 
     // toggle off restores the shop page, including pinned option values
     await swEval(() => chrome.storage.sync.set({ enabled: false }));
@@ -574,18 +490,18 @@ async function fakeChecks() {
       document.getElementById('late').shadowRoot.getElementById('ls').textContent === '影子更新' && window.__closedRoot.textContent === '封闭的影子'),
       'shop page: toggle off removes pinned option values, restores labels and shadow roots');
     await swEval(() => chrome.storage.sync.set({ enabled: true }));
-    ok(await until(async () => (await text('#o1')) === 'CL[红色]'), 'shop page: toggle on again');
+    ok(await until(async () => (await text('#o1')) === 'EN[红色]'), 'shop page: toggle on again');
 
-    // large page: batch limits under premium
-    app.pageReqs.length = 0;
+    // large page: batch limits
+    await resetStats();
     await shop.evaluate(() => {
       const d = document.createElement('div'); d.id = 'big';
       for (let i = 0; i < 200; i++) { const p = document.createElement('p'); p.textContent = '这是第' + i + '个商品的详细描述，'.repeat(14); d.appendChild(p); }
       document.body.appendChild(d);
     });
-    ok(await until(() => shop.evaluate(() => [...document.querySelectorAll('#big p')].every((p) => p.textContent.startsWith('CL['))), 15000), 'large page: 200 long texts translated through the app');
-    const sizes = app.pageReqs.map((r) => [r.texts.length, r.texts.join('').length]);
-    ok(sizes.every(([n, c]) => n <= 60 && c <= 6000) && sizes.some(([n, c]) => c > 4000), 'v2: premium batches are large (up to 60 texts / 6000 chars) but bounded', JSON.stringify(sizes));
+    ok(await until(() => shop.evaluate(() => [...document.querySelectorAll('#big p')].every((p) => p.textContent.startsWith('EN['))), 15000), 'large page: 200 long texts translated');
+    const sizes = (await stats()).batches;
+    ok(sizes.length > 1 && sizes.every(([n, c]) => n <= 60 && (c <= 4000 || n === 1)), 'large page: batches stay within 60 texts / 4000 characters', JSON.stringify(sizes));
     await shop.close();
 
     // --- 11. security: what a web page (or a compromised content script) can reach
@@ -614,7 +530,7 @@ async function fakeChecks() {
       ])`);
       ok(Array.isArray(forged) && forged.slice(0, 4).every((r) => r === 'ignored'), 'service worker ignores engine.* / recheck messages from content scripts', JSON.stringify(forged));
       ok(Array.isArray(forged) && forged.slice(4, 7).every((r) => r && r.ok === false && r.error === 'bad-request'), 'service worker rejects malformed / oversized page batches', JSON.stringify(forged));
-      ok(Array.isArray(forged) && forged[7] && forged[7].ok === true && forged[7].translations[0] === 'CL[验证]', 'service worker still serves a well-formed page batch', JSON.stringify(forged));
+      ok(Array.isArray(forged) && forged[7] && forged[7].ok === true && forged[7].translations[0] === 'EN[验证]', 'service worker still serves a well-formed page batch', JSON.stringify(forged));
       const forgedOcr = await csEval(`Promise.all([
         chrome.runtime.sendMessage({ type: 'ocrImage', url: 'file:///etc/passwd' }),
         chrome.runtime.sendMessage({ type: 'ocrImage', url: 'chrome://settings/' }),
@@ -630,137 +546,44 @@ async function fakeChecks() {
     }
     await cdp.detach();
     await page.evaluate(() => { document.getElementById('dyn').textContent = '页面变量无效'; });
-    ok(await until(async () => (await snap()).dyn === 'CL[页面变量无效]'), 'page-defined __fakeTranslator / debug flags have no effect');
+    ok(await until(async () => (await snap()).dyn === 'EN[页面变量无效]'), 'page-defined __fakeTranslator / debug flags have no effect');
 
-    // --- 12. fallbacks: page-error, user setting, timeout, disconnect
-    app.mode = 'error';
-    app.pageReqs.length = 0;
-    await page.evaluate(() => { document.getElementById('dyn').textContent = '错误回退'; });
-    ok(await until(async () => (await snap()).dyn === 'EN[错误回退]'), 'v2: page-error -> this batch falls back to the on-device translator', (await snap()).dyn);
-    ok(app.pageReqs.length === 1 && app.pageReqs[0].texts[0] === '错误回退', 'v2: the app was asked first', JSON.stringify(sentTexts()));
-    app.mode = 'answer';
-    await page.evaluate(() => { document.getElementById('dyn').innerHTML = '<i>错误回退</i>'; });
-    ok(await until(async () => (await snap()).dyn === 'CL[错误回退]'), 'v2: an on-device fallback result is not cached as the app engine\'s result', (await snap()).dyn);
-
-    // user setting off / on
-    await swEval(() => chrome.storage.sync.set({ usePremium: false }));
-    ok(await stateIs((x) => x.pageEngine === 'chrome' && x.premium === true && x.usePremium === false), 'setting off: pageEngine chrome although the app offers premium', JSON.stringify(await engineState()));
-    ok(await until(async () => (await popup.textContent('#page-engine')) === 'Chrome-Übersetzer'), 'popup shows Chrome-Übersetzer when the setting is off');
-    app.pageReqs.length = 0;
-    await page.evaluate(() => { document.getElementById('dyn').textContent = '设置关闭'; });
-    ok(await until(async () => (await snap()).dyn === 'EN[设置关闭]') && app.pageReqs.length === 0, 'setting off: pages use the on-device translator, nothing is sent to the app');
-    await swEval(() => chrome.storage.sync.set({ usePremium: true }));
-    ok(await stateIs((x) => x.pageEngine === 'claude'), 'setting on again: pageEngine claude');
-    await popup.screenshot({ path: path.join(os.tmpdir(), 'atx-popup.png') }).catch(() => {});
-    await popup.close();
-
-    // timeout
-    app.mode = 'silent';
-    app.pageReqs.length = 0;
-    const t0 = Date.now();
-    await page.evaluate(() => { document.getElementById('dyn').textContent = '超时回退'; });
-    await sleep(3000);
-    ok((await snap()).dyn === '超时回退' && app.pageReqs.length === 1, 'v2: while the app is silent the batch waits (no duplicate requests)', (await snap()).dyn + ' / ' + app.pageReqs.length);
-    ok(await until(async () => (await snap()).dyn === 'EN[超时回退]', 12000), 'v2: timeout -> on-device fallback', (await snap()).dyn);
-    const waited = Date.now() - t0;
-    ok(waited > 9000 && waited < 13000, 'v2: the timeout is about 10 s', waited + ' ms');
-    ok(await stateIs((x) => x.pageEngine === 'chrome' && x.premium === true, 2000), 'v2: after a timeout the app engine is paused (pageEngine chrome)', JSON.stringify(await engineState()));
-    await page.evaluate(() => { document.getElementById('dyn').textContent = '暂停期间'; });
-    ok(await until(async () => (await snap()).dyn === 'EN[暂停期间]', 3000) && app.pageReqs.length === 1, 'v2: during the pause pages translate on-device at once');
-    // late answer to the timed-out request is ignored
-    send({ type: 'page-result', id: app.pageReqs[0].id, translations: ['LATE'] });
-    app.mode = 'answer';
-    setAppState({ premium: false, engine: 'claude' });
-    setAppState({ premium: true, engine: 'claude' });
-    ok(await stateIs((x) => x.pageEngine === 'claude'), 'v2: a fresh app-state premium:true ends the pause');
-    ok((await snap()).dyn === 'EN[暂停期间]', 'v2: late page-result for a timed-out id is ignored');
-
-    // disconnect while a request is pending
-    app.mode = 'silent';
-    app.pageReqs.length = 0;
-    inbox.length = 0;
-    await page.evaluate(() => { document.getElementById('dyn').textContent = '断开回退'; });
-    ok(await until(() => app.pageReqs.length === 1, 4000), 'v2: request pending at the app');
-    for (const c of wss.clients) c.terminate();
-    ok(await until(async () => (await snap()).dyn === 'EN[断开回退]', 4000), 'v2: disconnect -> pending batch falls back on-device immediately', (await snap()).dyn);
-    app.mode = 'answer';
-    app.state = { premium: false, engine: 'claude' };
-    const helloAgain = await nextMsg((m) => m.type === 'hello', 10000);
-    ok(helloAgain && helloAgain.version === 2, 'bridge: reconnects after connection loss');
-    ok(await stateIs((x) => x.bridgeConnected && x.premium === false && x.pageEngine === 'chrome'), 'v2: premium state is reset by a disconnect and follows the new app-state', JSON.stringify(await engineState()));
-    await page.evaluate(() => { document.getElementById('dyn').textContent = '重连之后'; });
-    ok(await until(async () => (await snap()).dyn === 'EN[重连之后]'), 'v2: premium false after reconnect -> on-device, as before');
-
-    // --- 13. language pack missing: pages translate through the app only
-    inbox.length = 0;
-    app.pageReqs.length = 0;
-    app.state = { premium: true, engine: 'claude' };
+    // --- 13. language pack missing: pages wait, then resume without reload
     await swEval(() => chrome.storage.local.set({ debugFakeTranslator: 'missing' }));
-    const helloMissing = await nextMsg((m) => m.type === 'hello', 15000);
-    ok(helloMissing && helloMissing.ready === false && helloMissing.detail === 'Sprachpaket fehlt', 'pack missing: hello ready:false "Sprachpaket fehlt"', JSON.stringify(helloMissing));
+    const ms = await stateIs((x) => x.apiPresent && x.availability === 'downloadable' && x, 15000);
+    ok(ms && ms.ready === false && ms.pagesReady === false && ms.detail === 'Sprachpaket fehlt', 'pack missing: engineState ready:false, detail "Sprachpaket fehlt"', JSON.stringify(await engineState()));
     ok(await stateIs((x) => x.writeReady === false), 'pack missing: writing helper not ready', JSON.stringify(await engineState()));
-    const ms = await stateIs((x) => x.premium && x.pagesReady && x);
-    ok(ms && ms.ready === false && ms.pageEngine === 'claude' && ms.availability === 'downloadable', 'pack missing + premium: engineState ready:false, pagesReady:true, pageEngine claude', JSON.stringify(await engineState()));
     const page2 = await ctx.newPage();
     await page2.goto(base + 'basic.html');
-    ok(await until(async () => (await page2.textContent('#h')) === '  CL[你好世界]  ' && (await page2.title()) === 'CL[测试页面]'), 'pack missing + premium: a new page is translated through the app', await page2.textContent('#h'));
-    send({ type: 'translate', id: '60', source: 'zh', target: 'en', texts: ['你好'] });
-    const e60 = await nextMsg((m) => m.id === '60');
-    ok(e60 && e60.type === 'error' && !sentTexts().includes('你好'), 'pack missing: bridge translate answers error and is never routed to the app', JSON.stringify(e60));
-    // the app fails and there is no on-device fallback: text stays, then recovers
-    app.mode = 'error';
-    await page2.evaluate(() => { document.getElementById('dyn').textContent = '两者都不行'; });
     await sleep(1500);
-    ok((await page2.textContent('#dyn')) === '两者都不行', 'pack missing + page-error: text stays original (nothing to fall back to)');
-    app.mode = 'answer';
-    ok(await until(async () => (await page2.textContent('#dyn')) === 'CL[两者都不行]', 8000), 'pack missing: queued text is retried and translated once the app answers again');
-    // premium off: nothing can translate; premium on: the queue resumes
-    setAppState({ premium: false, engine: 'claude' });
-    ok(await stateIs((x) => x.pagesReady === false && x.pageEngine === 'chrome'), 'pack missing + premium off: pagesReady false');
-    await page2.evaluate(() => { document.getElementById('dyn').textContent = '等待引擎'; });
-    await sleep(1500);
-    ok((await page2.textContent('#dyn')) === '等待引擎', 'pack missing + premium off: page text is left alone');
+    ok((await page2.textContent('#h')) === '  你好世界  ', 'pack missing: page text is left alone');
     const tResume = Date.now();
-    setAppState({ premium: true, engine: 'claude' });
-    ok(await until(async () => (await page2.textContent('#dyn')) === 'CL[等待引擎]', 6000), 'premium on: waiting page resumes without reload', await page2.textContent('#dyn'));
-    console.log('INFO resume after premium on took', Date.now() - tResume, 'ms');
+    await swEval(() => chrome.storage.local.set({ debugFakeTranslator: 'all' }));
+    ok(await until(async () => (await page2.textContent('#h')) === '  EN[你好世界]  ', 15000), 'pack ready: the waiting page resumes without reload', await page2.textContent('#h'));
+    console.log('INFO resume after the pack became ready took', Date.now() - tResume, 'ms');
     await page2.close();
-    app.state = { premium: false, engine: 'claude' };
 
     // --- 7. tab fallback host (fake only in the tab)
-    inbox.length = 0;
     await swEval(() => chrome.storage.local.set({ debugFakeTranslator: 'tab' }));
-    const hello2 = await nextMsg((m) => m.type === 'hello', 15000);
-    ok(hello2 && hello2.ready === true, 'tab fallback: engine connects from tab host', JSON.stringify(hello2));
+    ok(await stateIs((x) => x.host === 'tab' && x.ready, 15000), 'tab fallback: engine runs in the tab host', JSON.stringify(await engineState()));
     ok((await local('engineMode')).engineMode === 'tab' && !(await swEval(() => chrome.offscreen.hasDocument())), 'tab fallback: mode tab, offscreen closed');
     const info = await swEval(async (u) => (await chrome.tabs.query({})).filter((t) => (t.url || '').startsWith(u)).map((t) => ({ pinned: t.pinned, active: t.active, id: t.id })), `chrome-extension://${extId}/engine.html`);
     ok(info.length === 1 && info[0].pinned && !info[0].active, 'tab fallback: exactly one pinned inactive engine tab', JSON.stringify(info));
     await page.evaluate(() => { document.getElementById('dyn').textContent = '标签页模式'; });
     ok(await until(async () => (await snap()).dyn === 'EN[标签页模式]'), 'tab fallback: page translation works');
-    setAppState({ premium: true, engine: 'claude' });
-    await stateIs((x) => x.pageEngine === 'claude');
-    await page.evaluate(() => { document.getElementById('dyn').textContent = '标签页高级'; });
-    ok(await until(async () => (await snap()).dyn === 'CL[标签页高级]'), 'tab fallback: premium page translation works from the tab host too');
-    app.state = { premium: false, engine: 'claude' };
-    inbox.length = 0;
     await swEval((id) => chrome.tabs.remove(id), info[0].id);
-    const hello3 = await nextMsg((m) => m.type === 'hello', 15000);
-    ok(!!hello3, 'tab fallback: engine tab re-created after being closed');
-    const info2 = await swEval(async (u) => (await chrome.tabs.query({})).filter((t) => (t.url || '').startsWith(u)).length, `chrome-extension://${extId}/engine.html`);
-    ok(info2 === 1, 'tab fallback: still exactly one engine tab', String(info2));
+    const engineTabs = () => swEval(async (u) => (await chrome.tabs.query({})).filter((t) => (t.url || '').startsWith(u) && t.id !== undefined).map((t) => t.id), `chrome-extension://${extId}/engine.html`);
+    ok(await until(async () => { const ids = await engineTabs(); return ids.length === 1 && ids[0] !== info[0].id; }, 15000), 'tab fallback: engine tab re-created after being closed');
+    await sleep(1500);
+    ok((await engineTabs()).length === 1, 'tab fallback: still exactly one engine tab');
+    await page.evaluate(() => { document.getElementById('dyn').textContent = '重新打开之后'; });
+    ok(await until(async () => (await snap()).dyn === 'EN[重新打开之后]', 15000), 'tab fallback: translation works again after the engine tab was re-created');
 
-    // --- 8. bridge reconnect after the app restarts
-    inbox.length = 0;
-    for (const c of wss.clients) c.terminate();
-    const hello4 = await nextMsg((m) => m.type === 'hello', 10000);
-    ok(!!hello4, 'bridge: reconnects after connection loss (tab host)');
-    ok(origins.every((o) => o === 'chrome-extension://' + extId), 'bridge: every connection carried the extension origin (' + origins.length + ' connections)', origins.join());
   } catch (e) {
     console.log('FAIL exception', e);
     failed++;
   } finally {
     await ctx.close().catch(() => {});
-    wss.close();
     server.close();
     fs.rmSync(profile, { recursive: true, force: true });
   }

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Auto Translator",
-  "version": "1.2.0",
+  "version": "2.0.0",
   "description": "Übersetzt chinesische Webseiten und Bilder automatisch ins Englische, offline. Schreibhilfe: Englisch tippen, Chinesisch einfügen.",
   "minimum_chrome_version": "138",
   "permissions": [

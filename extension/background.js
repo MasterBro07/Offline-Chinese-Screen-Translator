@@ -9,7 +9,6 @@
 
 const OFFSCREEN_PATH = 'offscreen.html';
 const ENGINE_TAB_URL = chrome.runtime.getURL('engine.html');
-const DEFAULT_PORT = 47613;
 const KEEPALIVE_ALARM = 'engine-keepalive';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -49,7 +48,7 @@ async function doEnsureEngine() {
         reasons: ['WORKERS'],
         justification:
           'Hosts the on-device Translator API (not available in service workers) ' +
-          'and the localhost WebSocket to the Auto Translator desktop app.',
+          'and the offline text recognition for images (WebAssembly).',
       });
       return true;
     } catch (e) {
@@ -157,6 +156,21 @@ const MAX_REQUEST_CHARS = 100000;
 // writing helper (English -> Chinese).
 const ALLOWED_PAIRS = new Set(['zh>en', 'zh-Hant>en', 'en>zh']);
 
+// Request statistics for the automated tests (only while the test translator is switched on).
+let debugMode = false;
+globalThis.autoTranslatorStats = { requests: 0, texts: [], batches: [] };
+chrome.storage.local.get('debugFakeTranslator').then((r) => { debugMode = DEBUG_FAKE_VALUES.has(r.debugFakeTranslator); });
+
+function recordStats(texts) {
+  if (!debugMode) return;
+  const stats = globalThis.autoTranslatorStats;
+  stats.requests++;
+  stats.batches.push([texts.length, texts.join('').length]);
+  stats.texts.push(...texts);
+  if (stats.texts.length > 5000) stats.texts.splice(0, stats.texts.length - 5000);
+  if (stats.batches.length > 500) stats.batches.splice(0, stats.batches.length - 500);
+}
+
 const MAX_IMAGE_URL = 8192;
 const MENU_IMAGE = 'translate-image';
 
@@ -219,34 +233,19 @@ function sanitizeEngineState(state) {
     apiPresent: s.apiPresent === true,
     availability: text(s.availability, 'unavailable'),
     ready: s.ready === true,
-    bridgeConnected: s.bridgeConnected === true,
     host: text(s.host, 'none'),
-    premium: s.premium === true,
-    usePremium: s.usePremium !== false,
     pagesReady: s.pagesReady === true,
     pageEngine: text(s.pageEngine, 'chrome'),
     writeReady: s.writeReady === true,
+    detail: typeof s.detail === 'string' && s.detail.length <= 120 ? s.detail : '',
   };
-}
-
-async function getUsePremium() {
-  try {
-    return (await chrome.storage.sync.get('usePremium')).usePremium !== false;
-  } catch (e) {
-    return true;
-  }
 }
 
 async function handleMessage(message, sender) {
   switch (message.type) {
     case 'engine.getConfig': {
-      const cfg = await chrome.storage.local.get(['bridgePort', 'debugFakeTranslator']);
-      const port = Number(cfg.bridgePort);
-      return {
-        port: Number.isInteger(port) && port > 0 && port < 65536 ? port : DEFAULT_PORT,
-        debugFake: DEBUG_FAKE_VALUES.has(cfg.debugFakeTranslator) ? cfg.debugFakeTranslator : null,
-        usePremium: await getUsePremium(),
-      };
+      const cfg = await chrome.storage.local.get('debugFakeTranslator');
+      return { debugFake: DEBUG_FAKE_VALUES.has(cfg.debugFakeTranslator) ? cfg.debugFakeTranslator : null };
     }
     case 'engine.hello':
       return handleEngineHello(message, sender);
@@ -259,6 +258,7 @@ async function handleMessage(message, sender) {
       const source = message.source === undefined ? 'zh' : message.source;
       const target = message.target === undefined ? 'en' : message.target;
       if (!ALLOWED_PAIRS.has(source + '>' + target)) return { ok: false, error: 'bad-request' };
+      if (source !== 'en') recordStats(message.texts);
       try {
         return await sendToEngine({
           type: 'engine.translate',
@@ -371,9 +371,8 @@ chrome.tabs.onRemoved.addListener(async () => {
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && (changes.bridgePort || changes.debugFakeTranslator)) restartEngine();
-  if (area === 'sync' && changes.usePremium) {
-    // User switched the desktop app's engine for web pages on or off.
-    sendToEngine({ type: 'engine.config', usePremium: changes.usePremium.newValue !== false }).catch(() => {});
+  if (area === 'local' && changes.debugFakeTranslator) {
+    debugMode = DEBUG_FAKE_VALUES.has(changes.debugFakeTranslator.newValue);
+    restartEngine();
   }
 });

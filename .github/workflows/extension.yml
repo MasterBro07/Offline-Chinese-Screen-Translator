@@ -31,7 +31,7 @@ jobs:
       - name: Install Playwright
         shell: pwsh
         run: |
-          npm i playwright ws
+          npm i playwright
           npx playwright install chromium
 
       - name: Extension tests with real translation (Chromium)

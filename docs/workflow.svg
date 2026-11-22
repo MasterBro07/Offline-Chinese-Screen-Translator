@@ -1,95 +1,152 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
-  <title>How Auto Translator works: everything runs offline in Chrome on your PC</title>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="770" viewBox="0 0 1200 770" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title>How Auto Translator works: three pipelines, everything offline in Chrome on your PC</title>
   <defs>
-    <marker id="purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-      <path d="M0 0 L10 5 L0 10 z" fill="#8250df"/>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#57606a"/>
     </marker>
-    <marker id="blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-      <path d="M0 0 L10 5 L0 10 z" fill="#0969da"/>
-    </marker>
-    <marker id="gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#6e7781"/>
     </marker>
   </defs>
 
   <!-- card -->
-  <rect x="0.5" y="0.5" width="1199" height="719" rx="16" fill="#ffffff" stroke="#d0d7de"/>
+  <rect x="0.5" y="0.5" width="1199" height="769" rx="16" fill="#ffffff" stroke="#d0d7de"/>
   <text x="40" y="50" font-size="24" font-weight="700" fill="#1f2328">How Auto Translator works</text>
-  <text x="40" y="76" font-size="15" fill="#57606a">A Chrome extension: Chinese on web pages becomes English, without a single click</text>
+  <text x="40" y="76" font-size="15" fill="#57606a">Three pipelines inside Chrome: page text, text in images, and writing in Chinese</text>
 
   <!-- offline boundary -->
-  <rect x="24" y="96" width="1152" height="490" rx="14" fill="#f0fdf4" stroke="#1a7f37" stroke-width="2" stroke-dasharray="8 6"/>
+  <rect x="24" y="96" width="1152" height="532" rx="14" fill="#f0fdf4" stroke="#1a7f37" stroke-width="2" stroke-dasharray="8 6"/>
   <text x="46" y="124" font-size="13" font-weight="700" fill="#1a7f37" letter-spacing="1.2">YOUR PC · 100 % OFFLINE</text>
   <text x="1154" y="124" font-size="13" fill="#1a7f37" text-anchor="end">no page text, image or typed text ever leaves this computer</text>
 
-  <!-- row 1: what is on the page -->
-  <text x="60" y="160" font-size="14" font-weight="700" fill="#0969da">On the web page</text>
-  <g font-size="12.5" fill="#57606a">
-    <rect x="60" y="172" width="320" height="76" rx="10" fill="#ffffff" stroke="#0969da" stroke-width="1.5"/>
-    <text x="78" y="202" font-size="15" font-weight="700" fill="#1f2328">Page text</text>
-    <text x="78" y="226">Chinese text, also text that loads later</text>
-
-    <rect x="440" y="172" width="320" height="76" rx="10" fill="#ffffff" stroke="#0969da" stroke-width="1.5"/>
-    <text x="458" y="202" font-size="15" font-weight="700" fill="#1f2328">Images</text>
-    <text x="458" y="226">Product photos, banners, long detail images</text>
-
-    <rect x="820" y="172" width="320" height="76" rx="10" fill="#ffffff" stroke="#0969da" stroke-width="1.5"/>
-    <text x="838" y="202" font-size="15" font-weight="700" fill="#1f2328">Text fields</text>
-    <text x="838" y="226">You type English: a message, a search</text>
+  <!-- column headers -->
+  <g font-size="12" font-weight="700" fill="#57606a" letter-spacing="0.6">
+    <text x="50" y="160">ON THE PAGE</text>
+    <text x="280" y="160">EXTENSION</text>
+    <text x="510" y="160">IF TRADITIONAL</text>
+    <text x="740" y="160">TRANSLATE</text>
+    <text x="970" y="160">RESULT</text>
   </g>
 
-  <!-- row 2: what the extension does -->
-  <text x="60" y="296" font-size="14" font-weight="700" fill="#8250df">Auto Translator extension</text>
-  <g font-size="12.5" fill="#57606a">
-    <rect x="60" y="308" width="320" height="96" rx="10" fill="#ffffff" stroke="#8250df" stroke-width="1.5"/>
-    <text x="78" y="338" font-size="15" font-weight="700" fill="#1f2328">Find &amp; replace</text>
-    <text x="78" y="362">English replaces the Chinese right in</text>
-    <text x="78" y="380">the page; hover shows the original</text>
+  <!-- lane A: page text (blue) -->
+  <g font-size="12" fill="#57606a">
+    <rect x="50" y="176" width="190" height="96" rx="10" fill="#ddf4ff" stroke="#0969da" stroke-width="1.5"/>
+    <text x="64" y="202" font-size="14" font-weight="700" fill="#1f2328">Page text</text>
+    <text x="64" y="224">Chinese text, also text</text>
+    <text x="64" y="241">that loads later, titles,</text>
+    <text x="64" y="258">menus, placeholders</text>
 
-    <rect x="440" y="308" width="320" height="96" rx="10" fill="#ffffff" stroke="#8250df" stroke-width="1.5"/>
-    <text x="458" y="338" font-size="15" font-weight="700" fill="#1f2328">Read text in images</text>
-    <text x="458" y="362">Built-in text recognition (PaddleOCR);</text>
-    <text x="458" y="380">English boxes are drawn over the image</text>
+    <rect x="280" y="176" width="190" height="96" rx="10" fill="#ffffff" stroke="#0969da" stroke-width="1.5"/>
+    <text x="294" y="202" font-size="14" font-weight="700" fill="#1f2328">Find Chinese text</text>
+    <text x="294" y="224">All frames, pop-ups and</text>
+    <text x="294" y="241">shadow DOM; watches for</text>
+    <text x="294" y="258">new text, batches it</text>
 
-    <rect x="820" y="308" width="320" height="96" rx="10" fill="#ffffff" stroke="#8250df" stroke-width="1.5"/>
-    <text x="838" y="338" font-size="15" font-weight="700" fill="#1f2328">Writing helper</text>
-    <text x="838" y="362">Shows the Chinese below the field;</text>
-    <text x="838" y="380">"Einfügen" puts it in</text>
-  </g>
-  <g stroke="#0969da" stroke-width="2" fill="none">
-    <path d="M330 248 V304" marker-end="url(#blue)"/>
-    <path d="M710 248 V304" marker-end="url(#blue)"/>
-    <path d="M1090 248 V304" marker-end="url(#blue)"/>
+    <rect x="970" y="176" width="190" height="96" rx="10" fill="#ffffff" stroke="#0969da" stroke-width="1.5"/>
+    <text x="984" y="202" font-size="14" font-weight="700" fill="#1f2328">English in the page</text>
+    <text x="984" y="224">Replaces the Chinese in</text>
+    <text x="984" y="241">place; hover shows the</text>
+    <text x="984" y="258">original</text>
   </g>
 
-  <!-- translator -->
-  <g font-size="12.5" fill="#57606a">
-    <rect x="390" y="456" width="420" height="80" rx="10" fill="#ffffff" stroke="#8250df" stroke-width="2.5"/>
-    <text x="410" y="486" font-size="15" font-weight="700" fill="#1f2328">Chrome's built-in translator</text>
-    <text x="410" y="510">on-device · Chinese → English · English → Chinese</text>
+  <!-- lane B: images (purple) -->
+  <g font-size="12" fill="#57606a">
+    <rect x="50" y="300" width="190" height="96" rx="10" fill="#fbefff" stroke="#8250df" stroke-width="1.5"/>
+    <text x="64" y="326" font-size="14" font-weight="700" fill="#1f2328">Images</text>
+    <text x="64" y="348">Product photos, banners,</text>
+    <text x="64" y="365">long detail images</text>
 
-    <rect x="880" y="462" width="260" height="68" rx="10" fill="#ffffff" stroke="#8250df" stroke-width="1.5" stroke-dasharray="4 3"/>
-    <text x="898" y="490" font-size="13.5" font-weight="700" fill="#1f2328">Language packs</text>
-    <text x="898" y="512">stored by Chrome on your disk</text>
+    <rect x="280" y="300" width="190" height="96" rx="10" fill="#ffffff" stroke="#8250df" stroke-width="1.5"/>
+    <text x="294" y="326" font-size="14" font-weight="700" fill="#1f2328">Read text in image</text>
+    <text x="294" y="348">Built-in text recognition</text>
+    <text x="294" y="365">(PaddleOCR on</text>
+    <text x="294" y="382">WebAssembly)</text>
+
+    <rect x="970" y="300" width="190" height="96" rx="10" fill="#ffffff" stroke="#8250df" stroke-width="1.5"/>
+    <text x="984" y="326" font-size="14" font-weight="700" fill="#1f2328">English on the image</text>
+    <text x="984" y="348">Dark boxes over the</text>
+    <text x="984" y="365">Chinese lines; "原文"</text>
+    <text x="984" y="382">shows the original</text>
   </g>
-  <g stroke="#8250df" stroke-width="2" fill="none">
-    <path d="M220 404 V440 Q220 496 280 496 H386" marker-end="url(#purple)" marker-start="url(#purple)"/>
-    <path d="M600 404 V452" marker-end="url(#purple)" marker-start="url(#purple)"/>
-    <path d="M980 404 V440 Q980 440 960 440 H760 Q740 440 740 452" marker-end="url(#purple)"/>
-    <path d="M810 496 H876" stroke-dasharray="4 3"/>
+
+  <!-- lane C: writing (orange) -->
+  <g font-size="12" fill="#57606a">
+    <rect x="50" y="424" width="190" height="96" rx="10" fill="#fff1e5" stroke="#bc4c00" stroke-width="1.5"/>
+    <text x="64" y="450" font-size="14" font-weight="700" fill="#1f2328">Text fields</text>
+    <text x="64" y="472">You type English:</text>
+    <text x="64" y="489">a message, a search</text>
+
+    <rect x="280" y="424" width="190" height="96" rx="10" fill="#ffffff" stroke="#bc4c00" stroke-width="1.5"/>
+    <text x="294" y="450" font-size="14" font-weight="700" fill="#1f2328">Writing helper</text>
+    <text x="294" y="472">Bar below the field</text>
+    <text x="294" y="489">shows the Chinese</text>
+
+    <rect x="970" y="424" width="190" height="96" rx="10" fill="#ffffff" stroke="#bc4c00" stroke-width="1.5"/>
+    <text x="984" y="450" font-size="14" font-weight="700" fill="#1f2328">Chinese in the field</text>
+    <text x="984" y="472">"Einfügen" or</text>
+    <text x="984" y="489">Ctrl+Shift+Enter</text>
   </g>
-  <text x="232" y="436" font-size="12.5" fill="#8250df">text ⇄ English</text>
-  <text x="612" y="436" font-size="12.5" fill="#8250df">lines ⇄ English</text>
-  <text x="992" y="432" font-size="12.5" fill="#8250df">English → Chinese</text>
+
+  <!-- shared: traditional -> simplified (lanes A and B) -->
+  <g font-size="12" fill="#57606a">
+    <rect x="510" y="176" width="190" height="220" rx="10" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
+    <text x="524" y="202" font-size="14" font-weight="700" fill="#1f2328">Traditional →</text>
+    <text x="524" y="220" font-size="14" font-weight="700" fill="#1f2328">simplified</text>
+    <text x="524" y="244">Taiwan and Hong Kong</text>
+    <text x="524" y="261">text is converted with</text>
+    <text x="524" y="278">the built-in OpenCC</text>
+    <text x="524" y="295">table (營業 → 营业);</text>
+    <text x="524" y="312">simplified text passes</text>
+    <text x="524" y="329">unchanged</text>
+  </g>
+
+  <!-- shared: translator (all lanes) -->
+  <g font-size="12" fill="#57606a">
+    <rect x="740" y="176" width="190" height="344" rx="10" fill="#ffffff" stroke="#1a7f37" stroke-width="2.5"/>
+    <text x="754" y="202" font-size="14" font-weight="700" fill="#1f2328">Chrome's built-in</text>
+    <text x="754" y="220" font-size="14" font-weight="700" fill="#1f2328">translator</text>
+    <text x="754" y="244">On-device, no server</text>
+    <text x="754" y="276" font-weight="700" fill="#0969da">Chinese → English</text>
+    <text x="754" y="293">page text and image</text>
+    <text x="754" y="310">lines; cached, so</text>
+    <text x="754" y="327">repeated text is instant</text>
+    <text x="754" y="476" font-weight="700" fill="#bc4c00">English → Chinese</text>
+    <text x="754" y="493">writing helper</text>
+  </g>
+
+  <!-- arrows -->
+  <g stroke="#57606a" stroke-width="2" fill="none">
+    <path d="M240 224 H276" marker-end="url(#a)"/>
+    <path d="M470 224 H506" marker-end="url(#a)"/>
+    <path d="M700 224 H736" marker-end="url(#a)"/>
+    <path d="M930 224 H966" marker-end="url(#a)"/>
+
+    <path d="M240 348 H276" marker-end="url(#a)"/>
+    <path d="M470 348 H506" marker-end="url(#a)"/>
+    <path d="M700 348 H736" marker-end="url(#a)"/>
+    <path d="M930 348 H966" marker-end="url(#a)"/>
+
+    <path d="M240 472 H276" marker-end="url(#a)"/>
+    <path d="M470 472 H736" marker-end="url(#a)"/>
+    <path d="M930 472 H966" marker-end="url(#a)"/>
+  </g>
+
+  <!-- language packs -->
+  <g font-size="12" fill="#57606a">
+    <rect x="740" y="548" width="190" height="60" rx="10" fill="#ffffff" stroke="#1a7f37" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <text x="754" y="572" font-size="13" font-weight="700" fill="#1f2328">Language packs</text>
+    <text x="754" y="592">zh → en, en → zh, on disk</text>
+  </g>
+  <path d="M835 520 V544" stroke="#1a7f37" stroke-width="2" stroke-dasharray="4 3" fill="none"/>
 
   <!-- outside: internet, used once -->
-  <path d="M1010 530 V600" stroke="#6e7781" stroke-width="2" stroke-dasharray="5 4" fill="none" marker-end="url(#gray)"/>
-  <text x="998" y="562" font-size="12.5" fill="#6e7781" text-anchor="end">one-time download</text>
-  <rect x="740" y="604" width="420" height="84" rx="12" fill="#f6f8fa" stroke="#8c959f" stroke-dasharray="6 5"/>
-  <text x="760" y="630" font-size="14" font-weight="700" fill="#57606a">Internet</text>
-  <text x="760" y="652" font-size="12.5" fill="#57606a">Used once: Chrome downloads the language packs.</text>
-  <text x="760" y="672" font-size="12.5" fill="#57606a">Page text, images and what you type are never uploaded.</text>
+  <path d="M835 608 V658" stroke="#6e7781" stroke-width="2" stroke-dasharray="5 4" fill="none" marker-end="url(#g)"/>
+  <text x="823" y="648" font-size="12" fill="#6e7781" text-anchor="end">one-time download</text>
+  <rect x="640" y="662" width="520" height="84" rx="12" fill="#f6f8fa" stroke="#8c959f" stroke-dasharray="6 5"/>
+  <text x="660" y="688" font-size="14" font-weight="700" fill="#57606a">Internet</text>
+  <text x="660" y="710" font-size="12.5" fill="#57606a">Used once: Chrome downloads the two language packs.</text>
+  <text x="660" y="730" font-size="12.5" fill="#57606a">The text recognition and the OpenCC table ship with the extension.</text>
 
-  <text x="40" y="630" font-size="12.5" fill="#57606a">Works in Google Chrome on Windows, macOS and Linux</text>
-  <text x="40" y="652" font-size="12.5" fill="#57606a">No account · no API key · no telemetry · free</text>
+  <text x="40" y="676" font-size="12.5" fill="#57606a">Google Chrome 138+ on Windows, macOS and Linux</text>
+  <text x="40" y="698" font-size="12.5" fill="#57606a">No account · no API key · no telemetry · free</text>
 </svg>

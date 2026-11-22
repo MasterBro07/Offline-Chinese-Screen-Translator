@@ -17,7 +17,7 @@ kein API-Schlüssel, kein Abo.
 > geschrieben, getestet und dokumentiert. Keine Zeile wurde von Hand programmiert. Die Erweiterung wird
 > automatisch unter Windows, macOS und Linux getestet und läuft beim Autor gut, ist aber ein Hobbyprojekt.
 
-Ein Ablaufdiagramm steht in [docs/workflow.svg](docs/workflow.svg).
+![Ablauf: drei Wege. Seitentext: chinesischen Text finden, traditionell bei Bedarf in vereinfacht umwandeln, mit Chromes Offline-Übersetzer übersetzen, direkt ersetzen. Bilder: Text mit der eingebauten Texterkennung lesen, umwandeln, übersetzen, englische Kästchen über das Bild legen. Textfelder: die Schreibhilfe übersetzt Englisch ins Chinesische und fügt es ein. Alles offline in Chrome.](docs/workflow.svg)
 
 ## Was sie kann
 
@@ -25,6 +25,8 @@ Ein Ablaufdiagramm steht in [docs/workflow.svg](docs/workflow.svg).
   Chats, eingebetteten Bereichen, Auswahllisten und Bildbeschreibungen.
 - **Direkt in der Seite:** Das Englische ersetzt das Chinesische; mit der Maus darüberfahren zeigt das
   Original. Eingabefelder und Passwörter werden nie angefasst.
+- **Jede Seite:** Auch Seiten, die sich als „nicht übersetzen“ markieren (häufig bei Buchungs- und
+  Shopseiten), denn die Erweiterung tauscht nur Text aus und baut die Seite nicht um.
 - **Text in Bildern** wird erkannt und übersetzt (siehe unten).
 - **Schreibhilfe:** Englisch tippen, Chinesisch einfügen (siehe unten).
 - **Vereinfachtes und traditionelles Chinesisch** (Festland, Taiwan, Hongkong): Traditionelle Texte werden

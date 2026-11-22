@@ -23,7 +23,7 @@ and no page text or image is ever uploaded.
 
 *Deutsche Anleitung: [README.de.md](README.de.md)*
 
-![How Auto Translator works: the extension reads Chinese page text and image text, Chrome's on-device translator translates it, and the English replaces the original. Everything runs offline in Chrome on your PC; the internet is used only once to download the language packs.](docs/workflow.svg)
+![How Auto Translator works: three pipelines. Page text: find Chinese text, convert traditional to simplified if needed, translate with Chrome's on-device translator, replace in place. Images: read the text with the built-in OCR, convert if needed, translate, draw English boxes over the image. Text fields: the writing helper translates English to Chinese and inserts it. Everything runs offline in Chrome; the internet is used once to download the language packs.](docs/workflow.svg)
 
 ---
 
@@ -65,6 +65,8 @@ unplug the network cable and translation keeps working.
   scroll, chat or browse: infinite scroll, pop-ups, chats, iframes, drop-down menus, image captions.
 - **In place.** The English replaces the Chinese right in the page; hover over a text to see the original.
   Input fields and passwords are never touched.
+- **Every page.** Also pages that mark themselves "do not translate" (common on booking and shop sites),
+  because the extension only swaps text and never rebuilds the page.
 - **Text in images:** Chinese text in product photos, banners and long detail pictures is recognised and
   translated automatically; the English is drawn right over it. See [Text in images](#text-in-images).
 - **Writing in Chinese:** type English into a text field on a Chinese page and the Chinese translation
@@ -169,16 +171,20 @@ extension popup (*Schreibhilfe in Eingabefeldern*).
 
 ## How it works
 
+The diagram above shows the three pipelines; step by step:
+
 1. **Find:** content scripts look for Chinese text in the page (also in iframes, shadow DOM, attributes
    like placeholders and image captions) and watch for new text.
-2. **Translate:** the text goes to the extension's engine, which runs in a hidden extension page and uses
+2. **Traditional → simplified:** text in traditional characters (Taiwan, Hong Kong) is converted with the
+   built-in OpenCC table; simplified text passes unchanged.
+3. **Translate:** the text goes to the extension's engine, which runs in a hidden extension page and uses
    Chrome's built-in on-device Translator API. Translations are cached, so repeated text is instant.
-3. **Replace:** the English is written back into the page in place; the original is kept for the tooltip
+4. **Replace:** the English is written back into the page in place; the original is kept for the tooltip
    and for switching off.
-4. **Images:** larger images are loaded by the engine and read with the built-in text recognition
-   (PaddleOCR PP-OCRv4 on WebAssembly). The recognised lines are translated and drawn as boxes over the
-   image.
-5. **Writing:** in text fields, English input is translated English → Chinese and inserted on request.
+5. **Images:** larger images are loaded by the engine and read with the built-in text recognition
+   (PaddleOCR PP-OCRv4 on WebAssembly). The recognised lines go through steps 2 and 3 and are drawn as
+   boxes over the image.
+6. **Writing:** in text fields, English input is translated English → Chinese and inserted on request.
 
 ## For developers
 

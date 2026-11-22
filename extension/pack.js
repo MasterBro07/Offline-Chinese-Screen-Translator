@@ -73,6 +73,11 @@ const LanguagePack = (() => {
             report();
           });
         },
+      }).then((translator) => {
+        // A pack that was already on disk sends no progress events: count it as done.
+        fractions[i] = 1;
+        report();
+        return translator;
       }));
       const results = await Promise.allSettled(jobs);
       for (const r of results) {

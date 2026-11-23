@@ -53,8 +53,8 @@ kein API-Schlüssel, kein Abo.
 1. In Chrome die Adresse `chrome://extensions` öffnen.
 2. Oben rechts den **Entwicklermodus** einschalten.
 3. Auf **„Entpackte Erweiterung laden“** klicken und den entpackten Ordner auswählen.
-4. Auf der Willkommensseite (oder im Popup der Erweiterung) **„Sprachpakete laden“** anklicken und warten,
-   bis *bereit* dasteht. Ein Klick lädt beide Pakete: Chinesisch → Englisch für Webseiten und
+4. Auf der Willkommensseite (oder im Popup der Erweiterung) **„Download language packs“** anklicken und warten,
+   bis *ready* dasteht. Ein Klick lädt beide Pakete: Chinesisch → Englisch für Webseiten und
    Englisch → Chinesisch für die Schreibhilfe. Das ist nur einmal nötig.
 
 **Fertig.** Chinesische Webseiten werden jetzt automatisch übersetzt. Schon offene Tabs einmal neu laden.
@@ -67,9 +67,9 @@ Die Erweiterung übersetzt auch diese, automatisch und offline.
 - Größere Bilder im sichtbaren Bereich einer chinesischen Seite werden nacheinander gelesen, etwa 0,5 s pro
   Bild (ein langes Detailbild dauert ein paar Sekunden). Das Englische erscheint als dunkle Kästchen über dem
   Chinesischen.
-- Der kleine Knopf **原文** am Bild zeigt das Original, ein weiterer Klick wieder die Übersetzung.
-- **Rechtsklick auf ein Bild → „Bild übersetzen“** übersetzt ein einzelnes Bild sofort, auch kleine.
-- Abschalten lässt es sich im Popup der Erweiterung (*Bilder automatisch übersetzen*).
+- Der kleine Knopf **Original** am Bild zeigt das Original, ein weiterer Klick wieder die Übersetzung.
+- **Rechtsklick auf ein Bild → „Translate image“** übersetzt ein einzelnes Bild sofort, auch kleine.
+- Abschalten lässt es sich im Popup der Erweiterung (*Translate images automatically*).
 
 Die Texterkennung (PaddleOCR PP-OCRv4 mit ONNX Runtime) steckt in der Erweiterung selbst; deshalb ist der
 Download etwa 17 MB groß (entpackt etwa 30 MB). Bilder werden auf dem eigenen PC gelesen und nie hochgeladen.
@@ -83,33 +83,34 @@ Eine Nachricht an den Verkäufer, eine Suche im chinesischen Shop, ein Formular?
 1. In ein Textfeld auf einer Seite mit chinesischem Text klicken (Chat, Suche, Kommentar, Nachricht …).
 2. Auf Englisch tippen. Nach einer kurzen Pause zeigt eine dunkle Leiste unter dem Feld die chinesische
    Übersetzung.
-3. Auf **Einfügen** klicken oder **Strg+Umschalt+Enter** drücken: Der chinesische Text ersetzt das Getippte.
+3. Auf **Insert** klicken oder **Strg+Umschalt+Enter** (Ctrl+Shift+Enter) drücken: Der chinesische Text ersetzt das Getippte.
    **Esc** oder **×** blendet die Leiste für dieses Feld aus.
 
 Die Schreibhilfe drängt sich nicht auf: Sie erscheint nur auf Seiten mit chinesischem Text, nur bei englischer
 Eingabe und nie bei Passwort-, E-Mail-, Telefon-, Zahlen- oder Kartennummer-Feldern. Das Getippte wird auf dem
-eigenen PC übersetzt, nicht gespeichert und nur nach „Einfügen“ ins Feld geschrieben. Abschalten lässt sie sich
-im Popup der Erweiterung (*Schreibhilfe in Eingabefeldern*).
+eigenen PC übersetzt, nicht gespeichert und nur nach „Insert“ ins Feld geschrieben. Abschalten lässt sie sich
+im Popup der Erweiterung (*Writing helper in text fields*).
 
 ## Bedienung
 
-Alles über das Symbol der Erweiterung (eventuell zuerst auf das Puzzle-Symbol klicken):
+Alles über das Symbol der Erweiterung (eventuell zuerst auf das Puzzle-Symbol klicken). Die Oberfläche der
+Erweiterung ist englisch:
 
-- **Webseiten automatisch übersetzen** – Übersetzung ein/aus
-- **Auf dieser Seite deaktivieren** – für eine einzelne Website abschalten
-- **Bilder automatisch übersetzen** – Texterkennung in Bildern ein/aus
-- **Schreibhilfe in Eingabefeldern** – ein/aus
-- Oben steht, ob die Sprachpakete bereit sind.
+- **Translate web pages automatically** – Übersetzung ein/aus
+- **Turn off on this site** – für eine einzelne Website abschalten
+- **Translate images automatically** – Texterkennung in Bildern ein/aus
+- **Writing helper in text fields** – ein/aus
+- Oben steht, ob die Sprachpakete bereit sind (*ready*).
 
 ## Wenn etwas nicht klappt
 
 - **Nach einem Update oder Neuinstallieren der Erweiterung wird nichts übersetzt:** offene Tabs einmal neu laden
   (**F5**). Chrome setzt die neue Version nur in Seiten ein, die nach dem Update geöffnet werden.
-- **Im Popup steht „Sprachpakete fehlen“:** im Popup auf **„Sprachpakete laden“** klicken und warten, bis
-  *bereit* dasteht.
+- **Im Popup stehen die Sprachpakete auf „missing“:** im Popup auf **„Download language packs“** klicken und
+  warten, bis *ready* dasteht.
 - **Das Popup meldet, dass der Übersetzer nicht verfügbar ist:** Chrome aktualisieren (Version 138 oder neuer)
   und auf einem Computer verwenden.
-- **Ein Bild wird nicht übersetzt:** Sehr kleine Bilder werden ausgelassen; Rechtsklick → **„Bild übersetzen“**.
+- **Ein Bild wird nicht übersetzt:** Sehr kleine Bilder werden ausgelassen; Rechtsklick → **„Translate image“**.
 
 ## Bekannte Grenzen
 

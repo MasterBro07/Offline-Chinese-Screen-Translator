@@ -22,11 +22,11 @@ web page ─┬─ content.js   page text, attributes, shadow DOM, frames  ─�
 | File | Role |
 |---|---|
 | `manifest.json` | MV3; permissions `storage`, `offscreen`, `tabs`, `alarms`, `contextMenus`, `scripting`; host access `<all_urls>`; CSP allows `wasm-unsafe-eval` for the OCR runtime |
-| `background.js` | Keeps exactly one engine host alive (offscreen document, else a pinned tab), validates every message from content scripts, routes `translate` and `ocrImage`, right-click menu "Bild übersetzen", screenshot fallback for images the engine cannot download |
+| `background.js` | Keeps exactly one engine host alive (offscreen document, else a pinned tab), validates every message from content scripts, routes `translate` and `ocrImage`, right-click menu "Translate image", screenshot fallback for images the engine cannot download |
 | `engine.js` | Translator instances per language pair, translation cache, readiness polling, publishes `engineState`; runs the image OCR queue (one image at a time, results cached per URL) |
 | `ocr/ocr.js` | Offline OCR: detector (DB post-processing, connected components, unclip), recogniser (CTC greedy decoding), tall images in overlapping tiles |
 | `content.js` | Finds and replaces Chinese text in place, batching with rate limits, MutationObserver, restores originals when switched off |
-| `images.js` | Picks larger images near the viewport on Chinese pages, requests OCR, draws English boxes over the image in a shadow root (object-fit aware, follows scrolling), "原文" toggle |
+| `images.js` | Picks larger images near the viewport on Chinese pages, requests OCR, draws English boxes over the image in a shadow root (object-fit aware, follows scrolling), "Original" toggle |
 | `compose.js` | Writing helper: preview bar below text fields, inserts the Chinese translation on request |
 | `pack.js`, `popup.*`, `welcome.*` | Language pack status and one-click download (needs a user gesture), switches |
 

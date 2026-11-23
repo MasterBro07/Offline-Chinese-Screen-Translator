@@ -28,14 +28,14 @@
 
   function renderApp(state) {
     const ready = !!(state && state.ready);
-    pageEngine.textContent = ready ? 'bereit' : 'Sprachpaket fehlt';
+    pageEngine.textContent = ready ? 'ready' : 'language pack missing';
     pageEngine.dataset.state = ready ? 'available' : 'downloadable';
-    engineHint.textContent = 'Chinesisch → Englisch, kostenlos und direkt auf diesem Gerät.';
+    engineHint.textContent = 'Chinese → English, free and right on this device.';
 
     // Writing helper (English -> Chinese).
     const writeReady = !!(state && state.writeReady);
     const composeOn = composeBox.checked;
-    composeStatus.textContent = !composeOn ? 'aus' : writeReady ? 'bereit' : 'Sprachpaket fehlt';
+    composeStatus.textContent = !composeOn ? 'off' : writeReady ? 'ready' : 'language pack missing';
     composeStatus.dataset.state = !composeOn ? 'off' : writeReady ? 'available' : 'downloadable';
   }
 

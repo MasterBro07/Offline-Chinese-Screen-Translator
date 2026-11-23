@@ -38,12 +38,12 @@ const LanguagePack = (() => {
 
   function statusText(state, percent) {
     switch (state) {
-      case 'available': return 'bereit';
+      case 'available': return 'ready';
       case 'downloading':
-        return typeof percent === 'number' ? 'werden geladen ' + percent + ' %' : 'werden geladen …';
-      case 'downloadable': return 'fehlen';
-      case 'no-api': return 'nicht verfügbar';
-      default: return 'wird nicht unterstützt';
+        return typeof percent === 'number' ? 'downloading ' + percent + ' %' : 'downloading …';
+      case 'downloadable': return 'missing';
+      case 'no-api': return 'not available';
+      default: return 'not supported';
     }
   }
 
@@ -104,12 +104,12 @@ const LanguagePack = (() => {
       const showButton = state === 'downloadable' || state === 'downloading';
       elements.button.hidden = !showButton;
       elements.button.disabled = state === 'downloading';
-      elements.button.textContent = state === 'downloading' ? 'Sprachpakete werden geladen …' : 'Sprachpakete laden';
+      elements.button.textContent = state === 'downloading' ? 'Downloading language packs …' : 'Download language packs';
       if (elements.hint) {
         elements.hint.hidden = state !== 'no-api' && state !== 'unavailable';
         elements.hint.textContent = state === 'no-api'
-          ? 'Dieser Browser hat keine eingebaute Übersetzung. Benötigt wird Chrome 138 oder neuer auf einem Computer (Windows, Mac, Linux).'
-          : 'Dieses Chrome kann Chinesisch → Englisch nicht übersetzen. Bitte Chrome aktualisieren.';
+          ? 'This browser has no built-in translator. Chrome 138 or newer on a computer (Windows, Mac, Linux) is needed.'
+          : 'This Chrome cannot translate Chinese → English. Please update Chrome.';
       }
     }
 
@@ -131,7 +131,7 @@ const LanguagePack = (() => {
           percent = undefined;
           if (elements.error) {
             elements.error.hidden = false;
-            elements.error.textContent = 'Die Sprachpakete konnten nicht geladen werden. Bitte Internetverbindung prüfen und erneut versuchen.';
+            elements.error.textContent = 'The language packs could not be downloaded. Please check the internet connection and try again.';
           }
           refresh();
         },

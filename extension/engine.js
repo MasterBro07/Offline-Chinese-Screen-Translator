@@ -266,10 +266,10 @@
   function detailFor(state) {
     switch (state) {
       case 'available': return '';
-      case 'downloadable': return 'Sprachpaket fehlt';
-      case 'downloading': return 'Sprachpaket wird geladen';
-      case 'no-api': return 'Translator-API nicht verfügbar (Chrome 138 oder neuer nötig)';
-      default: return 'Übersetzung Chinesisch → Englisch wird von diesem Chrome nicht unterstützt';
+      case 'downloadable': return 'language pack missing';
+      case 'downloading': return 'language pack downloading';
+      case 'no-api': return 'Chrome translator not available (Chrome 138 or newer needed)';
+      default: return 'This Chrome does not support Chinese → English translation';
     }
   }
 
@@ -380,7 +380,7 @@
     if (!translatorApi || (hello && hello.shutdown)) {
       // The service worker closes this document and picks another host.
       stopped = true;
-      showNote('Die Übersetzungsfunktion von Chrome ist hier nicht verfügbar. Dieser Tab kann geschlossen werden.');
+      showNote('Chrome\'s translator is not available here. This tab can be closed.');
       return;
     }
     await recheck();

@@ -327,10 +327,10 @@ function scheduleKeepalive() {
   chrome.alarms.create(KEEPALIVE_ALARM, { periodInMinutes: 1 });
 }
 
-// Right-click on an image: "Bild übersetzen" translates it at once, whatever its size.
+// Right-click on an image: "Translate image" translates it at once, whatever its size.
 function createImageMenu() {
   chrome.contextMenus.removeAll(() => {
-    chrome.contextMenus.create({ id: MENU_IMAGE, title: 'Bild übersetzen', contexts: ['image'] }, () => void chrome.runtime.lastError);
+    chrome.contextMenus.create({ id: MENU_IMAGE, title: 'Translate image', contexts: ['image'] }, () => void chrome.runtime.lastError);
   });
 }
 

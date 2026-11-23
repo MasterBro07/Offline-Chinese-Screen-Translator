@@ -152,8 +152,8 @@ async function fakeChecks() {
     }
     if (welcome) {
       const wtxt = await welcome.innerText('body');
-      ok(/Sprachpakete laden/.test(wtxt) && /Auf Chinesisch schreiben/.test(wtxt) && /Text in Bildern/.test(wtxt) && !/Desktop-App/.test(wtxt), 'welcome page shows German steps incl. images and writing helper, no desktop app');
-      ok(!/Claude|API-Schlüssel/.test(wtxt), 'welcome page does not mention Claude or API keys');
+      ok(/Download the language packs/.test(wtxt) && /Write in Chinese/.test(wtxt) && /Text in images/.test(wtxt) && !/Desktop-App/.test(wtxt), 'welcome page shows English steps incl. images and writing helper, no desktop app');
+      ok(!/Claude|API key/i.test(wtxt), 'welcome page does not mention Claude or API keys');
     }
 
     // --- 1. simulate missing Translator API: offscreen -> tab -> none
@@ -252,12 +252,12 @@ async function fakeChecks() {
     const popup = await ctx.newPage();
     await popup.goto(`chrome-extension://${extId}/popup.html`);
     const ptxt = await popup.innerText('body');
-    ok(/Sprachpaket/.test(ptxt) && !/Desktop-App/.test(ptxt) && /Webseiten automatisch übersetzen/.test(ptxt) && /Bilder automatisch übersetzen/.test(ptxt), 'popup renders German UI (no desktop app)');
-    ok(await until(async () => (await popup.textContent('#page-engine')) === 'bereit'), 'popup: Webseiten bereit', await popup.textContent('#page-engine'));
+    ok(/Language packs/.test(ptxt) && !/Desktop app|Desktop-App/i.test(ptxt) && /Translate web pages automatically/.test(ptxt) && /Translate images automatically/.test(ptxt) && !/[äöüß]/.test(ptxt), 'popup renders English UI (no desktop app)');
+    ok(await until(async () => (await popup.textContent('#page-engine')) === 'ready'), 'popup: web pages ready', await popup.textContent('#page-engine'));
     const direct = await popup.evaluate(() => chrome.runtime.sendMessage({ type: 'translate', source: 'zh', target: 'en', texts: ['你好', '', '  世界 ', '第一行\n第二行', '   ', '你好'] }));
     ok(direct && direct.ok && JSON.stringify(direct.translations) === JSON.stringify(['EN[你好]', '', '  EN[世界] ', 'EN[第一行]\nEN[第二行]', '   ', 'EN[你好]']),
       'translate message: order, length, whitespace, line breaks', JSON.stringify(direct));
-    ok(!(await popup.$('#use-premium')) && !/Claude|API-Schlüssel/.test(ptxt), 'popup: no premium setting, no Claude/API mention');
+    ok(!(await popup.$('#use-premium')) && !/Claude|API key/i.test(ptxt), 'popup: no premium setting, no Claude/API mention');
     console.log('INFO popup pack status (real API):', await popup.textContent('#pack-status'), '| button visible:', await popup.isVisible('#download'), '| hint visible:', await popup.isVisible('#api-hint'));
     await popup.uncheck('#enabled');
     ok(await until(async () => (await page.textContent('#h')) === '  你好世界  '), 'popup toggle switches page translation off');
@@ -293,8 +293,8 @@ async function fakeChecks() {
 
     // --- 6b. writing helper: type English, insert Chinese
     ok(await stateIs((x) => x.writeReady === true), 'compose: engineState writeReady with the fake translator', JSON.stringify(await engineState()));
-    ok(await until(async () => (await popup.textContent('#compose-status')) === 'bereit') && await popup.isChecked('#compose'),
-      'popup: Schreibhilfe bereit, switch on by default', await popup.textContent('#compose-status'));
+    ok(await until(async () => (await popup.textContent('#compose-status')) === 'ready') && await popup.isChecked('#compose'),
+      'popup: writing helper ready, switch on by default', await popup.textContent('#compose-status'));
     {
       const cp = await ctx.newPage();
       await cp.goto(base + 'compose.html');
@@ -307,7 +307,7 @@ async function fakeChecks() {
       await cp.keyboard.type('hello');
       ok(await shows('ZH[hello]'), 'compose: English in a text input shows the Chinese preview', await barText());
       await cp.click('auto-translator-compose .insert');
-      ok(await until(async () => (await cp.inputValue('#plain')) === 'ZH[hello]'), 'compose: "Einfügen" puts the translation into the field', await cp.inputValue('#plain'));
+      ok(await until(async () => (await cp.inputValue('#plain')) === 'ZH[hello]'), 'compose: "Insert" puts the translation into the field', await cp.inputValue('#plain'));
       ok(!(await barShown()) && (await cp.evaluate(() => document.activeElement.id)) === 'plain', 'compose: bar closes, focus stays in the field');
 
       await cp.click('#area');
@@ -430,7 +430,7 @@ async function fakeChecks() {
       ok(await until(async () => { const o = await overlay('clear'); return o && near(o.boxes[0].y, 20, 8); }, 3000), 'images: overlays follow the page when scrolling');
 
       await ip.locator('auto-translator-images .toggle').first().click();
-      ok(await until(async () => { const o = await overlay('clear'); return o && o.off; }, 3000), 'images: "原文" button shows the original');
+      ok(await until(async () => { const o = await overlay('clear'); return o && o.off; }, 3000), 'images: "Original" button shows the original');
       await ip.locator('auto-translator-images .toggle').first().click();
       ok(await until(async () => { const o = await overlay('clear'); return o && !o.off; }, 3000), 'images: and switches back to the translation');
 
@@ -440,13 +440,13 @@ async function fakeChecks() {
       ok(await until(async () => (await texts('clear')) === 'EN[限时特价] | EN[全场包邮]', 6000), 'images: switch on shows them again (from the cache)');
 
       const menu = await swEval(() => new Promise((r) => chrome.contextMenus.update('translate-image', {}, () => r(!chrome.runtime.lastError))));
-      ok(menu === true, 'images: right-click menu "Bild übersetzen" exists');
+      ok(menu === true, 'images: right-click menu "Translate image" exists');
       await swEval(async (src) => {
         const tabs = await chrome.tabs.query({});
         const tab = tabs.find((t) => (t.url || '').includes('/images.html'));
         await chrome.tabs.sendMessage(tab.id, { type: 'images.translateNow', srcUrl: src }, { frameId: 0 });
       }, base + 'img/clear.png?icon');
-      ok(await until(async () => (await texts('icon')) === 'EN[限时特价] | EN[全场包邮]', 15000), 'images: right-click "Bild übersetzen" also translates a small image', await texts('icon'));
+      ok(await until(async () => (await texts('icon')) === 'EN[限时特价] | EN[全场包邮]', 15000), 'images: right-click "Translate image" also translates a small image', await texts('icon'));
 
       const tReload = Date.now();
       await ip.reload();
@@ -578,7 +578,7 @@ async function fakeChecks() {
     // --- 13. language pack missing: pages wait, then resume without reload
     await swEval(() => chrome.storage.local.set({ debugFakeTranslator: 'missing' }));
     const ms = await stateIs((x) => x.apiPresent && x.availability === 'downloadable' && x, 15000);
-    ok(ms && ms.ready === false && ms.pagesReady === false && ms.detail === 'Sprachpaket fehlt', 'pack missing: engineState ready:false, detail "Sprachpaket fehlt"', JSON.stringify(await engineState()));
+    ok(ms && ms.ready === false && ms.pagesReady === false && ms.detail === 'language pack missing', 'pack missing: engineState ready:false, detail "language pack missing"', JSON.stringify(await engineState()));
     ok(await stateIs((x) => x.writeReady === false), 'pack missing: writing helper not ready', JSON.stringify(await engineState()));
     const page2 = await ctx.newPage();
     await page2.goto(base + 'basic.html');
@@ -643,7 +643,7 @@ async function realCheck() {
     if (state !== 'available') {
       await welcome.waitForSelector('#download:visible', { timeout: 10000 });
       await welcome.click('#download'); // a real click: Chrome requires a user gesture for the download
-      log('clicked "Sprachpaket laden", waiting up to 5 minutes');
+      log('clicked "Download language packs", waiting up to 5 minutes');
       const end = Date.now() + 5 * 60 * 1000;
       let lastText = '';
       while (Date.now() < end) {

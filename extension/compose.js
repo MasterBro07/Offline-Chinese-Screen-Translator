@@ -1,5 +1,5 @@
 // Writing helper: on pages with Chinese text, type English into a text field and get the
-// Chinese translation shown below it; "Einfügen" (or Ctrl+Shift+Enter) puts it into the field.
+// Chinese translation shown below it; "Insert" (or Ctrl+Shift+Enter) puts it into the field.
 //
 // Privacy: the typed text is translated on this device (Chrome's Translator API, en -> zh),
 // never stored, and only written into the field when the user asks for it.
@@ -108,14 +108,14 @@
     const insert = document.createElement('button');
     insert.className = 'insert';
     insert.type = 'button';
-    insert.textContent = 'Einfügen';
+    insert.textContent = 'Insert';
     const hint = document.createElement('span');
     hint.className = 'hint';
-    hint.textContent = 'Strg+Umschalt+Enter';
+    hint.textContent = 'Ctrl+Shift+Enter';
     const close = document.createElement('button');
     close.className = 'close';
     close.type = 'button';
-    close.title = 'Schreibhilfe für dieses Feld ausblenden';
+    close.title = 'Hide the writing helper for this field';
     close.textContent = '×';
     bar.append(text, insert, hint, close);
     root.append(style, bar);
@@ -148,7 +148,7 @@
     if (!host.isConnected) (document.body || document.documentElement).append(host);
     ui.text.textContent = message;
     ui.text.classList.toggle('muted', !isTranslation);
-    ui.text.lang = isTranslation ? 'zh' : 'de';
+    ui.text.lang = isTranslation ? 'zh' : 'en';
     ui.insert.disabled = !isTranslation;
     position();
   }
@@ -174,7 +174,7 @@
     // Only English (Latin) input without Chinese characters is translated.
     if (!text || text.length > MAX_CHARS || !LATIN.test(text) || HAN.test(text)) { hide(); return; }
     if (!writeReady) {
-      show('Für die Schreibhilfe fehlt noch ein Sprachpaket: im Erweiterungs-Symbol auf „Sprachpakete laden“ klicken.', false);
+      show('The writing helper needs a language pack: click the extension icon → “Download language packs”.', false);
       return;
     }
     if (text === translatedFor && translation) { show(translation, true); return; }
@@ -197,7 +197,7 @@
       translatedFor = text;
       show(translation, true);
     } else {
-      show('Übersetzung gerade nicht möglich.', false);
+      show('Translation not possible right now.', false);
     }
   }
 

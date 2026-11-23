@@ -1,56 +1,56 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Auto Translator einrichten</title>
+  <title>Set up Auto Translator</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body class="page">
   <main class="card">
-    <h1>Willkommen bei Auto Translator</h1>
+    <h1>Welcome to Auto Translator</h1>
     <p class="lead">
-      Chinesischer Text wird automatisch ins Englische übersetzt – ohne Klick, kostenlos
-      und direkt auf diesem Gerät. Einmalig ist nur ein kurzer Schritt nötig.
+      Chinese text is translated into English automatically: no clicks, free and right
+      on this device. Only one short step is needed, once.
     </p>
 
     <ol class="steps">
       <li>
-        <h2>Sprachpakete laden</h2>
+        <h2>Download the language packs</h2>
         <p>
-          Chrome lädt die Sprachpakete Chinesisch → Englisch und Englisch → Chinesisch einmalig
-          herunter (traditionelles Chinesisch aus Taiwan und Hongkong wird mit übersetzt). Das erfordert genau einen Klick. Danach funktioniert alles offline.
+          Chrome downloads the Chinese → English and English → Chinese language packs once
+          (traditional Chinese from Taiwan and Hong Kong is translated too). It takes exactly one
+          click. After that everything works offline.
         </p>
         <p>Status: <span class="value" id="pack-status" data-state="" aria-live="polite">…</span></p>
-        <button id="download" class="primary" hidden>Sprachpakete laden</button>
+        <button id="download" class="primary" hidden>Download language packs</button>
         <p id="download-error" class="hint error" hidden></p>
         <p id="api-hint" class="hint error" hidden></p>
       </li>
       <li>
-        <h2>Webseiten öffnen wie gewohnt</h2>
+        <h2>Browse as usual</h2>
         <p>
-          Sobald das Sprachpaket bereit ist, werden chinesische Texte auf allen Webseiten
-          von selbst übersetzt. Bereits geöffnete Seiten bitte einmal neu laden.
-          Über das Symbol der Erweiterung lässt sich die Übersetzung jederzeit
-          ganz oder nur für eine einzelne Seite abschalten.
+          As soon as the language packs are ready, Chinese text on every web page is
+          translated by itself. Reload pages that were already open once.
+          The extension icon turns translation off at any time, everywhere or for a
+          single site.
         </p>
       </li>
       <li>
-        <h2>Text in Bildern</h2>
+        <h2>Text in images</h2>
         <p>
-          Chinesischer Text in Bildern, etwa auf Produktfotos und Detailbildern in Shops, wird ebenfalls
-          automatisch erkannt und übersetzt; die englische Übersetzung erscheint direkt auf dem Bild.
-          Der Knopf „原文“ am Bild zeigt das Original. Einzelne Bilder lassen sich per Rechtsklick
-          → „Bild übersetzen“ übersetzen. Auch die Texterkennung läuft komplett auf diesem Gerät.
+          Chinese text in images, such as product photos and detail pictures in shops, is recognised
+          and translated automatically too; the English appears right on the image. The
+          “Original” button on the image shows the original. Right-click an image → “Translate image”
+          to translate a single one. The text recognition also runs entirely on this device.
         </p>
       </li>
       <li>
-        <h2>Auf Chinesisch schreiben</h2>
+        <h2>Write in Chinese</h2>
         <p>
-          Wer auf einer chinesischen Seite in ein Feld schreibt, etwa eine Nachricht an den Verkäufer
-          oder eine Suche, kann einfach Englisch tippen. Darunter erscheint die chinesische
-          Übersetzung; mit „Einfügen“ oder Strg+Umschalt+Enter wird sie ins Feld übernommen.
-          Der Text bleibt dabei auf diesem Gerät.
+          When you type into a field on a Chinese page, such as a message to a seller or a search,
+          just type English. The Chinese translation appears below it; “Insert” or
+          Ctrl+Shift+Enter puts it into the field. Your text stays on this device.
         </p>
       </li>
     </ol>

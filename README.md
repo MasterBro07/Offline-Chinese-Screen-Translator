@@ -56,7 +56,7 @@ Online translators send all of that to a server. Auto Translator does not.
 | Telemetry, accounts, API keys | none | — |
 
 The only download is the language packs (Chinese → English, and English → Chinese for the writing
-helper), which Chrome fetches once from Google when you click **"Sprachpakete laden"**. After that you can
+helper), which Chrome fetches once from Google when you click **"Download language packs"**. After that you can
 unplug the network cable and translation keeps working.
 
 ## What you get
@@ -75,8 +75,7 @@ unplug the network cable and translation keeps working.
   simplified characters on your PC (OpenCC table) and then translated, so no extra pack is needed.
 - **Free** and open source.
 
-> The extension's interface is in German. Pages are translated Chinese → English; the writing helper
-> translates English → Chinese.
+> Pages are translated Chinese → English; the writing helper translates English → Chinese.
 
 ## Text in images
 
@@ -85,9 +84,9 @@ detail images. The extension translates those too, automatically and offline.
 
 - Larger images near the visible part of a Chinese page are read one after another, about 0.5 s per
   picture (a long detail image takes a few seconds). The English appears as dark boxes over the Chinese.
-- The small **原文** button on an image shows the original; click again for the translation.
-- **Right-click an image → "Bild übersetzen"** translates a single image at once, also small ones.
-- Turn it off in the extension popup (*Bilder automatisch übersetzen*).
+- The small **Original** button on an image shows the original; click again for the translation.
+- **Right-click an image → "Translate image"** translates a single image at once, also small ones.
+- Turn it off in the extension popup (*Translate images automatically*).
 
 The text recognition (PaddleOCR PP-OCRv4, run with ONNX Runtime) is built into the extension, which is
 why the download is about 17 MB zipped (about 30 MB unpacked). Images are read on your PC and never
@@ -99,13 +98,13 @@ Need to message a seller, search a Chinese shop or fill in a form? Just type in 
 
 1. Click into a text field on a page with Chinese text (chat box, search, comment, message …).
 2. Type in English. After a short pause a dark bar below the field shows the Chinese translation.
-3. Click **Einfügen** (insert) or press **Ctrl + Shift + Enter**: the Chinese text replaces what you typed.
+3. Click **Insert** or press **Ctrl + Shift + Enter**: the Chinese text replaces what you typed.
    **Esc** or **×** closes the bar for that field.
 
 The helper stays out of the way: it only appears on pages with Chinese text, only for English input, and
 never on password, e-mail, phone, number or card-number fields. What you type is translated on your PC,
-is not stored, and is only written into the field when you click *Einfügen*. Turn it off in the
-extension popup (*Schreibhilfe in Eingabefeldern*).
+is not stored, and is only written into the field when you click *Insert*. Turn it off in the
+extension popup (*Writing helper in text fields*).
 
 ## Requirements
 
@@ -131,8 +130,8 @@ extension popup (*Schreibhilfe in Eingabefeldern*).
 1. In Chrome, type `chrome://extensions` into the address bar and press Enter.
 2. Turn on **Developer mode** (switch in the top right corner).
 3. Click **Load unpacked** and select the unzipped folder.
-4. A welcome page opens. Click **"Sprachpakete laden"** (download language packs) and wait until the status
-   says **"bereit"** (ready). One click downloads both packs: Chinese → English for pages and
+4. A welcome page opens. Click **"Download language packs"** and wait until the status
+   says **"ready"**. One click downloads both packs: Chinese → English for pages and
    English → Chinese for the writing helper. This is the only time anything is downloaded.
 
 **Done.** Chinese websites are now translated automatically. Tabs that were already open need one reload.
@@ -141,23 +140,23 @@ extension popup (*Schreibhilfe in Eingabefeldern*).
 
 | Action | How |
 |---|---|
-| Pause translation | Click the extension icon → untick *Webseiten automatisch übersetzen* |
-| Switch off for one site | Click the extension icon → *Auf dieser Seite deaktivieren* |
+| Pause translation | Click the extension icon → untick *Translate web pages automatically* |
+| Switch off for one site | Click the extension icon → *Turn off on this site* |
 | See the original of a text | Hover over it |
-| Show the original text of an image | Click **原文** on the image (again for the translation) |
-| Translate one particular image | Right-click it → **Bild übersetzen** |
-| Write Chinese in a text field | Type English, then **Einfügen** or **Ctrl + Shift + Enter** (see [Writing in Chinese](#writing-in-chinese)) |
-| Switch features on / off | Extension popup: *Bilder automatisch übersetzen*, *Schreibhilfe in Eingabefeldern* |
+| Show the original text of an image | Click **Original** on the image (again for the translation) |
+| Translate one particular image | Right-click it → **Translate image** |
+| Write Chinese in a text field | Type English, then **Insert** or **Ctrl + Shift + Enter** (see [Writing in Chinese](#writing-in-chinese)) |
+| Switch features on / off | Extension popup: *Translate images automatically*, *Writing helper in text fields* |
 
 ## Troubleshooting
 
 | Problem | Fix |
 |---|---|
 | Nothing is translated after updating or reinstalling the extension | Reload the open tabs once (**F5**). Chrome only adds the new version to pages opened after the update. |
-| Extension popup says **"Sprachpakete fehlen"** | Click **"Sprachpakete laden"** in the popup and wait until it says *bereit*. |
-| The writing helper says a language pack is missing | Same fix: **"Sprachpakete laden"** in the popup. |
+| Extension popup says language packs **"missing"** | Click **"Download language packs"** in the popup and wait until it says *ready*. |
+| The writing helper says a language pack is missing | Same fix: **"Download language packs"** in the popup. |
 | The popup says the translator is not available | Update Chrome (version 138 or newer is needed) and use it on a desktop computer. |
-| An image is not translated | Very small images are skipped; right-click → **Bild übersetzen**. Text in decorative fonts may not be recognised. |
+| An image is not translated | Very small images are skipped; right-click → **Translate image**. Text in decorative fonts may not be recognised. |
 
 ## Known limits
 

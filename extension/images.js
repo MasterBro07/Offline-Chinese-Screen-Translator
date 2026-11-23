@@ -1,7 +1,7 @@
 // Text in images: on pages with Chinese text, larger images in view are sent (one at a time) to the
 // engine, which recognises Chinese text offline (PaddleOCR) and translates it on-device. The English
-// lines are drawn as dark boxes exactly over the Chinese ones. A small "原文" button on the image shows
-// the original again. Right-click → "Bild übersetzen" translates any single image right away.
+// lines are drawn as dark boxes exactly over the Chinese ones. A small "Original" button on the image shows
+// the original again. Right-click → "Translate image" translates any single image right away.
 //
 // Nothing from the page is parsed as HTML; the overlays live in their own shadow root, marked
 // as the extension's own UI, so the page translation (content.js) skips them.
@@ -20,8 +20,8 @@
   const MIN_FONT_PX = 9;
   const RETRY_MS = 15000;
 
-  let pageOn = true; // "Webseiten automatisch übersetzen"
-  let imagesOn = true; // "Bilder automatisch übersetzen"
+  let pageOn = true; // "Translate web pages automatically"
+  let imagesOn = true; // "Translate images automatically"
   let siteOff = false;
   let running = false;
   let dead = false;
@@ -267,15 +267,15 @@
       const toggle = document.createElement('button');
       toggle.className = 'toggle';
       toggle.type = 'button';
-      toggle.textContent = '原文';
-      toggle.title = 'Original zeigen';
+      toggle.textContent = 'Original';
+      toggle.title = 'Show the original';
       toggle.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
         st.showOriginal = !st.showOriginal;
         inner.classList.toggle('off', st.showOriginal);
-        toggle.textContent = st.showOriginal ? 'EN' : '原文';
-        toggle.title = st.showOriginal ? 'Übersetzung zeigen' : 'Original zeigen';
+        toggle.textContent = st.showOriginal ? 'English' : 'Original';
+        toggle.title = st.showOriginal ? 'Show the translation' : 'Show the original';
       });
       layer.append(inner, toggle);
       st.layer = layer;

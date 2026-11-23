@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <title>Auto Translator</title>
@@ -13,43 +13,43 @@
 
   <section class="status" aria-live="polite">
     <div class="row">
-      <span class="label">Sprachpakete</span>
+      <span class="label">Language packs</span>
       <span class="value" id="pack-status" data-state="">…</span>
     </div>
     <div class="row">
-      <span class="label">Webseiten</span>
+      <span class="label">Web pages</span>
       <span class="value" id="page-engine" data-state="">…</span>
     </div>
     <div class="row">
-      <span class="label">Schreibhilfe</span>
+      <span class="label">Writing helper</span>
       <span class="value" id="compose-status" data-state="">…</span>
     </div>
   </section>
 
-  <button id="download" class="primary" hidden>Sprachpakete laden</button>
+  <button id="download" class="primary" hidden>Download language packs</button>
   <p id="download-error" class="hint error" hidden></p>
   <p id="api-hint" class="hint error" hidden></p>
 
   <section class="toggles">
     <label class="toggle">
       <input type="checkbox" id="enabled">
-      <span>Webseiten automatisch übersetzen</span>
+      <span>Translate web pages automatically</span>
     </label>
     <label class="toggle" id="site-row" hidden>
       <input type="checkbox" id="site-off">
-      <span>Auf dieser Seite deaktivieren<small id="site-name"></small></span>
+      <span>Turn off on this site<small id="site-name"></small></span>
     </label>
     <label class="toggle">
       <input type="checkbox" id="images">
-      <span>Bilder automatisch übersetzen<small>Text in Produktbildern, offline erkannt</small></span>
+      <span>Translate images automatically<small>Text in product images, recognised offline</small></span>
     </label>
     <label class="toggle">
       <input type="checkbox" id="compose">
-      <span>Schreibhilfe in Eingabefeldern<small>Englisch tippen, Chinesisch einfügen</small></span>
+      <span>Writing helper in text fields<small>Type English, insert Chinese</small></span>
     </label>
   </section>
 
-  <p class="hint" id="engine-hint">Chinesisch → Englisch, kostenlos und direkt auf diesem Gerät.</p>
+  <p class="hint" id="engine-hint">Chinese → English, free and right on this device.</p>
 
   <script src="pack.js"></script>
   <script src="popup.js"></script>
